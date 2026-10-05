@@ -165,6 +165,26 @@ for your terminal's own selection.
     nix build               # ./result/bin/glt
     nix profile install .   # install
     nix develop             # dev shell with go, gopls, golangci-lint, delve
+    nix build .#glt-windows        # ./result/bin/glt.exe (x86-64)
+    nix build .#glt-windows-arm64  # ./result/bin/glt.exe (ARM)
+
+Without Nix, `GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build ./cmd/glt`
+also works; there's no C code to cross-compile.
+
+### Windows
+
+- Use Windows Terminal. The old console window has no true colour, mouse
+  or clipboard escape support. Install a Nerd Font, or set
+  `ui.icons: unicode`.
+- Config lives in `%AppData%\glt\config.yml`, and the cache and
+  recent-projects state in `%LocalAppData%\glt`. On first run glt imports
+  glab's hosts from `%USERPROFILE%\.config\glab-cli` or
+  `%AppData%\glab-cli`.
+- `o` opens links in the default browser, and pipeline notifications
+  (`--notify`) show as Windows toasts through PowerShell.
+- Copying uses the terminal's clipboard escape (OSC 52), which Windows
+  Terminal supports.
+- `git` must be on the `PATH` for glt to detect the repo you're in.
 
 After changing dependencies, update `vendorHash` in `flake.nix`. Set it to
 `pkgs.lib.fakeHash`, run `nix build`, and copy the hash from the "got:" line.

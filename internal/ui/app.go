@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -476,11 +475,7 @@ func (a *App) checkNotify(msg resultMsg) {
 	if seen && isActive(prev) && !isActive(p.Status) {
 		title := fmt.Sprintf("Pipeline #%d %s", p.ID, p.Status)
 		body := p.Ref
-		go func() {
-			if path, err := exec.LookPath("notify-send"); err == nil {
-				exec.Command(path, "-a", "glt", title, body).Run()
-			}
-		}()
+		go notifyDesktop(title, body)
 		fmt.Fprint(os.Stderr, "\a")
 	}
 }
@@ -608,15 +603,7 @@ func openBrowser(url string) tea.Cmd {
 		if url == "" {
 			return flashMsg{"no URL", true}
 		}
-		var cmd *exec.Cmd
-		switch {
-		case os.Getenv("BROWSER") != "":
-			cmd = exec.Command(os.Getenv("BROWSER"), url)
-		case runtime.GOOS == "darwin":
-			cmd = exec.Command("open", url)
-		default:
-			cmd = exec.Command("xdg-open", url)
-		}
+		cmd := urlOpener(url)
 		if err := cmd.Start(); err != nil {
 			return flashMsg{"open: " + err.Error(), true}
 		}

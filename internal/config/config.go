@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -71,6 +72,11 @@ func Dir() string {
 	if d := os.Getenv("XDG_CONFIG_HOME"); d != "" {
 		return filepath.Join(d, "glt")
 	}
+	if runtime.GOOS == "windows" {
+		if d, err := os.UserConfigDir(); err == nil { // %AppData%
+			return filepath.Join(d, "glt")
+		}
+	}
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".config", "glt")
 }
@@ -126,16 +132,26 @@ func Load() (cfg *File, notice string, err error) {
 
 // importGlab copies hosts from glab's config into cfg, returning how many.
 func importGlab(cfg *File) int {
-	dir := os.Getenv("GLAB_CONFIG_DIR")
-	if dir == "" {
-		if x := os.Getenv("XDG_CONFIG_HOME"); x != "" {
-			dir = filepath.Join(x, "glab-cli")
-		} else {
-			home, _ := os.UserHomeDir()
-			dir = filepath.Join(home, ".config", "glab-cli")
+	var dirs []string
+	switch {
+	case os.Getenv("GLAB_CONFIG_DIR") != "":
+		dirs = []string{os.Getenv("GLAB_CONFIG_DIR")}
+	case os.Getenv("XDG_CONFIG_HOME") != "":
+		dirs = []string{filepath.Join(os.Getenv("XDG_CONFIG_HOME"), "glab-cli")}
+	default:
+		home, _ := os.UserHomeDir()
+		dirs = []string{filepath.Join(home, ".config", "glab-cli")}
+		if d, err := os.UserConfigDir(); err == nil && runtime.GOOS == "windows" {
+			dirs = append(dirs, filepath.Join(d, "glab-cli"))
 		}
 	}
-	b, err := os.ReadFile(filepath.Join(dir, "config.yml"))
+	var b []byte
+	err := os.ErrNotExist
+	for _, dir := range dirs {
+		if b, err = os.ReadFile(filepath.Join(dir, "config.yml")); err == nil {
+			break
+		}
+	}
 	if err != nil {
 		return 0
 	}

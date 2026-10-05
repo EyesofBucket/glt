@@ -23,12 +23,7 @@ type recentProject struct {
 const maxRecent = 40
 
 func stateDir(host string) string {
-	d := os.Getenv("XDG_STATE_HOME")
-	if d == "" {
-		home, _ := os.UserHomeDir()
-		d = filepath.Join(home, ".local", "state")
-	}
-	return filepath.Join(d, "glt", host)
+	return filepath.Join(stateBase(), "glt", host)
 }
 
 func loadRecent(host string) []recentProject {
