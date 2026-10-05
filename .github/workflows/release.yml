@@ -1,0 +1,92 @@
+name: Release
+
+# Every push to main is tested, then released as the next version. The
+# patch number goes up by default; put #minor or #major in a commit message
+# to bump those instead.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    name: Release
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # tags and history, to work out the next version
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Next version
+        id: version
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          last=$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -n1)
+          if [ -z "$last" ]; then
+            # first release: the version in flake.nix
+            next="v$(sed -n 's/.*version = "\(.*\)";/\1/p' flake.nix | head -n1)"
+          else
+            # commits since the last release decide the bump
+            msgs=$(git log --format=%B "$last..HEAD")
+            IFS=. read -r major minor patch <<<"${last#v}"
+            if grep -q '#major' <<<"$msgs"; then
+              next="v$((major + 1)).0.0"
+            elif grep -q '#minor' <<<"$msgs"; then
+              next="v$major.$((minor + 1)).0"
+            else
+              next="v$major.$minor.$((patch + 1))"
+            fi
+          fi
+          if git rev-parse -q --verify "refs/tags/$next" >/dev/null; then
+            echo "::error::$next already exists"; exit 1
+          fi
+          echo "Releasing $next"
+          echo "tag=$next" >>"$GITHUB_OUTPUT"
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          mkdir dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64; do
+            os=${target%/*} arch=${target#*/}
+            name="glt_${TAG#v}_${os}_${arch}"
+            exe=glt; [ "$os" = windows ] && exe=glt.exe
+            mkdir -p "build/$name"
+            GOOS=$os GOARCH=$arch go build -trimpath \
+              -ldflags "-s -w -X main.version=${TAG#v}" \
+              -o "build/$name/$exe" ./cmd/glt
+            cp README.md "build/$name/"
+            if [ "$os" = windows ]; then
+              (cd build && zip -qr "../dist/$name.zip" "$name")
+            else
+              tar -C build -czf "dist/$name.tar.gz" "$name"
+            fi
+          done
+          (cd dist && sha256sum -- * >checksums.txt)
+          ls -l dist
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          gh release create "$TAG" dist/* \
+            --target "$GITHUB_SHA" \
+            --title "glt $TAG" \
+            --generate-notes

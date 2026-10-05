@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -39,8 +40,12 @@ func TestLoadCreatesAndImports(t *testing.T) {
 		t.Fatalf("unexpected config %+v", cfg)
 	}
 	info, err := os.Stat(Path())
-	if err != nil || info.Mode().Perm() != 0o600 {
-		t.Fatalf("config file mode: %v %v", info, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Windows doesn't have Unix permission bits
+	if runtime.GOOS != "windows" && info.Mode().Perm() != 0o600 {
+		t.Fatalf("config file mode: %v", info.Mode())
 	}
 	// second load reads the file, no notice
 	cfg2, notice, err := Load()
