@@ -52,7 +52,7 @@
         apps.default = flake-utils.lib.mkApp { drv = self.packages.${system}.glt; };
 
         devShells.default = pkgs.mkShell {
-          packages = with pkgs; [ go gopls gotools golangci-lint delve ];
+          packages = with pkgs; [ go gopls gotools golangci-lint delve goreleaser ];
         };
       });
 }

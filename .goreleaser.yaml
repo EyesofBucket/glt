@@ -1,0 +1,38 @@
+# GoReleaser builds the release archives when a version tag is pushed (see
+# .github/workflows/release.yml). Try it locally with:
+#   goreleaser release --snapshot --clean
+version: 2
+
+project_name: glt
+
+builds:
+  - main: ./cmd/glt
+    binary: glt
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+
+archives:
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    wrap_in_directory: true
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github-native
+
+release:
+  name_template: "glt {{ .Tag }}"
+  prerelease: auto

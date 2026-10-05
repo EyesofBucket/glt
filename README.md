@@ -188,3 +188,20 @@ also works; there's no C code to cross-compile.
 
 After changing dependencies, update `vendorHash` in `flake.nix`. Set it to
 `pkgs.lib.fakeHash`, run `nix build`, and copy the hash from the "got:" line.
+
+## Releasing
+
+CI tests every branch push and pull request. To make a release, tag the
+commit with a version and push the tag:
+
+```sh
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The release workflow tests that commit. GoReleaser (`.goreleaser.yaml`)
+then builds archives for Linux, macOS and Windows on amd64 and arm64, and
+publishes them to a GitHub release with checksums and generated notes.
+Tags with a suffix, such as `v0.2.0-rc.1`, are marked as pre-releases.
+To try the build locally from the dev shell, run
+`goreleaser release --snapshot --clean` (output goes in `dist/`).

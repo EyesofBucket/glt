@@ -1,10 +1,10 @@
 name: CI
 
-# Pushes to main run this through the release workflow instead, so it
-# isn't run twice.
+# Runs on every branch push and pull request. Version tags run it through
+# the release workflow instead, so it isn't run twice.
 on:
   push:
-    branches-ignore: [main]
+    branches: ["**"]
   pull_request:
   workflow_call:
 
