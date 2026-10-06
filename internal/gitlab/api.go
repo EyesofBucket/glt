@@ -83,6 +83,8 @@ type MR struct {
 	ChangesCount        string    `json:"changes_count"`
 	DivergedCommits     int       `json:"diverged_commits_count"`
 	AutoMerge           bool      `json:"merge_when_pipeline_succeeds"`
+	RemoveSourceBranch  bool      `json:"force_remove_source_branch"`
+	Squash              bool      `json:"squash"`
 }
 
 // MRSummary is a lightweight row for the MR list (fetched via GraphQL so that
@@ -537,6 +539,14 @@ func (c *Client) Rebase(ctx context.Context, project string, iid int) error {
 func (c *Client) SetTitle(ctx context.Context, project string, iid int, title string) error {
 	_, err := c.do(ctx, http.MethodPut, fmt.Sprintf("/projects/%s/merge_requests/%d", pid(project), iid), nil, map[string]string{"title": title}, nil)
 	return err
+}
+
+// UpdateMR changes the given fields of an MR (title, description,
+// target_branch, labels, assignee_ids, reviewer_ids, ...).
+func (c *Client) UpdateMR(ctx context.Context, project string, iid int, fields map[string]any) (*MR, error) {
+	var mr MR
+	_, err := c.do(ctx, http.MethodPut, fmt.Sprintf("/projects/%s/merge_requests/%d", pid(project), iid), nil, fields, &mr)
+	return &mr, err
 }
 
 func (c *Client) AddNote(ctx context.Context, project string, iid int, body string) error {

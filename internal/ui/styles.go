@@ -26,26 +26,28 @@ var (
 	cBYellow  lipgloss.Color
 	cBBlue    lipgloss.Color
 
-	sBold    lipgloss.Style
-	sDim     lipgloss.Style
-	sFaint   lipgloss.Style
-	sAccent  lipgloss.Style
-	sKey     lipgloss.Style
-	sLink    lipgloss.Style
-	sErr     lipgloss.Style
-	sOK      lipgloss.Style
-	sWarn    lipgloss.Style
-	sHeader  lipgloss.Style
-	sStage   lipgloss.Style
-	sTitle   lipgloss.Style
-	sBorder  lipgloss.Style
-	sActive  lipgloss.Style
-	sActiveT lipgloss.Style
-	sMatch   lipgloss.Style
-	sSection lipgloss.Style
-	sBrand   lipgloss.Style
-	sTabOn   lipgloss.Style
-	sTabOff  lipgloss.Style
+	sBold     lipgloss.Style
+	sDim      lipgloss.Style
+	sFaint    lipgloss.Style
+	sAccent   lipgloss.Style
+	sKey      lipgloss.Style
+	sLink     lipgloss.Style
+	sErr      lipgloss.Style
+	sOK       lipgloss.Style
+	sWarn     lipgloss.Style
+	sHeader   lipgloss.Style
+	sStage    lipgloss.Style
+	sTitle    lipgloss.Style
+	sBorder   lipgloss.Style
+	sActive   lipgloss.Style
+	sActiveT  lipgloss.Style
+	sMatch    lipgloss.Style
+	sSection  lipgloss.Style
+	sBrand    lipgloss.Style
+	sTabOn    lipgloss.Style
+	sTabOff   lipgloss.Style
+	sButton   lipgloss.Style
+	sButtonOn lipgloss.Style
 
 	selBg string // SGR sequence for the selection band
 )
@@ -102,6 +104,8 @@ func applyTheme(t Theme) {
 	sBrand = lipgloss.NewStyle().Foreground(cMagenta)
 	sTabOn = lipgloss.NewStyle().Foreground(cBlue).Bold(true).Underline(true)
 	sTabOff = lipgloss.NewStyle().Foreground(cGray)
+	sButton = lipgloss.NewStyle().Background(cSurface).Padding(0, 1)
+	sButtonOn = lipgloss.NewStyle().Background(cBlue).Foreground(cOnAccent).Bold(true).Padding(0, 1)
 
 	selBg = sgrOf(lipgloss.NewStyle().Background(cSurface))
 	themePaint = newPainter(t)
@@ -323,4 +327,13 @@ func selectLine(line string, w int) string {
 	line = strings.ReplaceAll(line, "\x1b[0m", "\x1b[0m"+bg)
 	line = strings.ReplaceAll(line, "\x1b[m", "\x1b[m"+bg)
 	return bg + "\x1b[1m" + strings.ReplaceAll(line, bg, bg+"\x1b[1m") + "\x1b[0m"
+}
+
+// button draws a button as a block of colour: the surface colour, or the
+// accent when it's focused (or the default action).
+func button(label string, focused bool) string {
+	if focused {
+		return sButtonOn.Render(label)
+	}
+	return sButton.Render(label)
 }

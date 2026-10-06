@@ -89,6 +89,7 @@ type overlay interface {
 type modal struct {
 	prompt  string
 	onYes   func() tea.Cmd
+	no      bool // the No button is focused (Yes is to start)
 	input   *textarea.Model
 	onInput func(string) tea.Cmd
 }
@@ -183,6 +184,10 @@ func (a *App) push(v view) tea.Cmd {
 
 // back goes back one view; at the root there's nowhere to go.
 func (a *App) back() tea.Cmd {
+	// forms with unsaved changes ask first
+	if g, ok := a.top().(interface{ guardLeave(*App) bool }); ok && g.guardLeave(a) {
+		return nil
+	}
 	if len(a.stack) <= 1 {
 		a.setFlash("q or ctrl+c to quit", false)
 		return nil
@@ -251,9 +256,40 @@ func (a *App) confirm(prompt string, onYes func() tea.Cmd) {
 	a.modal = &modal{prompt: prompt, onYes: onYes}
 }
 
+func (a *App) confirming() bool { return a.modal != nil && a.modal.input == nil }
+
+// answer closes the confirm popup, running its action on yes.
+func (a *App) answer(yes bool) tea.Cmd {
+	m := a.modal
+	a.modal = nil
+	if yes {
+		return m.onYes()
+	}
+	a.setFlash("cancelled", false)
+	return nil
+}
+
+// renderConfirm floats the confirm prompt over the body.
+func (a *App) renderConfirm(body string, w, h int) string {
+	m := a.modal
+	bw := min(w-4, max(40, min(64, ansi.StringWidth(m.prompt)+8)))
+	inner := bw - 4
+	var lines []string
+	for _, l := range strings.Split(ansi.Wrap(m.prompt, inner, ""), "\n") {
+		lines = append(lines, sBold.Render(l))
+	}
+	yes := a.zone(button("yes (y)", !m.no), zone{click: func(bool) tea.Cmd { return a.answer(true) }})
+	no := a.zone(button("no (n)", m.no), zone{click: func(bool) tea.Cmd { return a.answer(false) }})
+	btns := yes + "  " + no
+	lines = append(lines, "", strings.Repeat(" ", max(0, inner-ansi.StringWidth(btns)))+btns)
+	box := pane("Confirm", lines, bw, len(lines)+2, true)
+	x, y := (w-bw)/2, max(0, (h-lipgloss.Height(box))/2)
+	return overlayAt(body, a.zone(box, zone{}), x, y)
+}
+
 func (a *App) prompt(title string, onInput func(string) tea.Cmd) tea.Cmd {
 	ta := textarea.New()
-	ta.Placeholder = "Write a comment… (ctrl+s to send, esc to cancel)"
+	ta.Placeholder = "Write a comment… (ctrl+s to send, ctrl+e for $EDITOR, esc to cancel)"
 	ta.ShowLineNumbers = false
 	ta.CharLimit = 0
 	ta.SetWidth(max(20, a.w-4))
@@ -360,6 +396,9 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 		a.setFlash(msg.text, msg.err)
 		return nil
 
+	case editorMsg:
+		return a.editorDone(msg)
+
 	case debounceMsg:
 		if a.overlay != nil && msg.v == any(a.overlay) {
 			return a.overlay.debounced(a, msg.seq)
@@ -402,6 +441,12 @@ func (a *App) handleKey(msg tea.KeyMsg) tea.Cmd {
 			case "esc":
 				a.modal = nil
 				return nil
+			case "ctrl+e":
+				in := m.input
+				return a.editText(in.Value(), func(text string) tea.Cmd {
+					in.SetValue(text)
+					return nil
+				})
 			case "ctrl+s":
 				text := strings.TrimSpace(m.input.Value())
 				a.modal = nil
@@ -414,11 +459,16 @@ func (a *App) handleKey(msg tea.KeyMsg) tea.Cmd {
 			*m.input, cmd = m.input.Update(msg)
 			return cmd
 		}
-		a.modal = nil
-		if s := msg.String(); s == "y" || s == "Y" || s == "enter" {
-			return m.onYes()
+		switch msg.String() {
+		case "y", "Y":
+			return a.answer(true)
+		case "n", "N", "esc", "q":
+			return a.answer(false)
+		case "enter", " ":
+			return a.answer(!m.no)
+		case "tab", "shift+tab", "left", "right", "h", "l":
+			m.no = !m.no
 		}
-		a.setFlash("cancelled", false)
 		return nil
 	}
 	if a.showHelp {
@@ -503,6 +553,11 @@ func (a *App) View() string {
 		body = a.overlay.render(a, body, a.w, bodyH)
 		a.ms.layer = 0
 	}
+	if a.confirming() {
+		a.ms.layer = 2
+		body = a.renderConfirm(body, a.w, bodyH)
+		a.ms.layer = 0
+	}
 	return a.finishFrame(body + "\n" + status + "\n" + footer)
 }
 
@@ -543,9 +598,11 @@ func spinnerFrame() string {
 func (a *App) renderFooter() string {
 	if m := a.modal; m != nil {
 		if m.input != nil {
-			return sBold.Render(m.prompt) + "\n" + m.input.View()
+			keys := sKey.Render("ctrl+s") + sDim.Render(" send  ") + sKey.Render("ctrl+e") + sDim.Render(" $EDITOR  ") + sKey.Render("esc") + sDim.Render(" cancel")
+			return sBold.Render(m.prompt) + "  " + keys + "\n" + m.input.View()
 		}
-		return sWarn.Bold(true).Render(m.prompt) + sDim.Render("  [y/N]")
+		return sKey.Render("y") + sDim.Render(" yes  ") + sKey.Render("n/esc") + sDim.Render(" no  ") +
+			sKey.Render("←/→") + sDim.Render(" choose  ") + sKey.Render("enter") + sDim.Render(" select")
 	}
 	if a.flash != "" {
 		st := sOK

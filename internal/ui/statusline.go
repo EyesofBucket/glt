@@ -80,6 +80,9 @@ func (a *App) mode() (string, lipgloss.Color) {
 		name = "MR"
 	case *mrNewView:
 		name = "NEW MR"
+		if mv := v.(*mrNewView); mv.editing() {
+			name = "EDIT MR"
+		}
 	case *pipelineListView:
 		name = "PIPELINES"
 	case *pipelineView:
