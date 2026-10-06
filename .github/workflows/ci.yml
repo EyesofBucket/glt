@@ -1,10 +1,11 @@
 name: CI
 
-# Runs on every branch push and pull request. Version tags run it through
-# the release workflow instead, so it isn't run twice.
+# Runs on pull requests and on pushes to main. Other branches are tested
+# once they have a pull request, so a branch with one isn't tested twice.
+# Version tags run it through the release workflow instead.
 on:
   push:
-    branches: ["**"]
+    branches: [main]
   pull_request:
   workflow_call:
 

@@ -214,7 +214,7 @@ After changing dependencies, update `vendorHash` in `flake.nix`. Set it to
 
 ## Releasing
 
-CI tests every branch push and pull request. To make a release, tag the
+CI tests pull requests and pushes to `main`. To make a release, tag the
 commit with a version and push the tag:
 
 ```sh
