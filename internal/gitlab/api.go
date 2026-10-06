@@ -716,3 +716,63 @@ func (c *Client) CreateMR(ctx context.Context, project string, m NewMR) (*MR, er
 	_, err := c.do(ctx, http.MethodPost, fmt.Sprintf("/projects/%s/merge_requests", pid(project)), nil, m, &mr)
 	return &mr, err
 }
+
+// TestCase is one test from a pipeline's JUnit reports.
+type TestCase struct {
+	Status        string  `json:"status"` // success, failed, skipped, error
+	Name          string  `json:"name"`
+	Classname     string  `json:"classname"`
+	File          string  `json:"file"`
+	ExecutionTime float64 `json:"execution_time"`
+	SystemOutput  string  `json:"system_output"`
+	StackTrace    string  `json:"stack_trace"`
+}
+
+// TestSuite is one job's (or one matrix job's) tests.
+type TestSuite struct {
+	Name         string     `json:"name"`
+	TotalTime    float64    `json:"total_time"`
+	TotalCount   int        `json:"total_count"`
+	SuccessCount int        `json:"success_count"`
+	FailedCount  int        `json:"failed_count"`
+	SkippedCount int        `json:"skipped_count"`
+	ErrorCount   int        `json:"error_count"`
+	SuiteError   string     `json:"suite_error"`
+	BuildIDs     []int      `json:"build_ids"`
+	TestCases    []TestCase `json:"test_cases"`
+}
+
+// TestReport is a pipeline's test results, as on its Tests tab.
+type TestReport struct {
+	TotalTime    float64     `json:"total_time"`
+	TotalCount   int         `json:"total_count"`
+	SuccessCount int         `json:"success_count"`
+	FailedCount  int         `json:"failed_count"`
+	SkippedCount int         `json:"skipped_count"`
+	ErrorCount   int         `json:"error_count"`
+	TestSuites   []TestSuite `json:"test_suites"`
+}
+
+// TestSummary is the counts alone, without the test cases.
+type TestSummary struct {
+	Total struct {
+		Time    float64 `json:"time"`
+		Count   int     `json:"count"`
+		Success int     `json:"success"`
+		Failed  int     `json:"failed"`
+		Skipped int     `json:"skipped"`
+		Error   int     `json:"error"`
+	} `json:"total"`
+	// the suites' counts and jobs (the full report leaves the jobs out)
+	TestSuites []TestSuite `json:"test_suites"`
+}
+
+func (c *Client) TestReportSummary(ctx context.Context, project string, pipeline int) (*TestSummary, error) {
+	var s TestSummary
+	return &s, c.get(ctx, fmt.Sprintf("/projects/%s/pipelines/%d/test_report_summary", pid(project), pipeline), nil, &s)
+}
+
+func (c *Client) TestReport(ctx context.Context, project string, pipeline int) (*TestReport, error) {
+	var r TestReport
+	return &r, c.get(ctx, fmt.Sprintf("/projects/%s/pipelines/%d/test_report", pid(project), pipeline), nil, &r)
+}

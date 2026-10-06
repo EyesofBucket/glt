@@ -99,10 +99,23 @@ Press `?` in any view. The main ones:
 | picker | type to filter, `ctrl+n/p` move, `ctrl+d/u` half page, `enter` open (in the tree, expands a group), `ctrl+t` tree/list view, `←/→` collapse/expand, `ctrl+o` browser, `ctrl+y` copy URL, `esc` close |
 | MR list | `enter` open, `p` pipeline, `tab`/`1-5` all open/mine/review requested/merged/closed, `c` new MR, `B` your branch's pipelines |
 | new MR | `tab`/`↑↓` move between fields, `enter` choose branch/template/labels/reviewers or toggle, `ctrl+s` create, `esc` cancel |
-| MR | `p` pipeline, `n` run a new pipeline, `l` edit labels, `a` approve/unapprove, `m` merge, `M` auto-merge, `R` rebase, `d` toggle draft, `c` comment |
+| MR | `p` pipeline, `T` test results, `n` run a new pipeline, `l` edit labels, `a` approve/unapprove, `m` merge, `M` auto-merge, `R` rebase, `d` toggle draft, `c` comment |
 | pipeline list | `enter` open, `b` pick a branch (your checked-out one first, or all branches), `n` run a pipeline, `R`/`X` retry/cancel, `/` search |
-| pipeline | `enter` log (or downstream pipeline), `r` retry job, `p` play manual job, `x` cancel job, `R`/`X` retry/cancel pipeline, `]/[` next/prev failed job, `v` toggle log preview |
+| pipeline | `enter` log (or downstream pipeline), `r` retry job, `p` play manual job, `x` cancel job, `R`/`X` retry/cancel pipeline, `]/[` next/prev failed job, `v` toggle log preview, `T` test results |
+| test results | `f` failed/all/skipped, `/` search, `enter` fold a suite or read a test's output, `tab` switch to the output, `]/[` next/prev failure, `z` fold all, `J` the suite's job log, `y` copy output, `o` the Tests tab in the browser, `esc` close |
 | log | `f` follow, `w` wrap, `T` timestamps, `#` line numbers, `/` `n` `N` search, `[ ]` jump between sections, `h/l` scroll sideways, `r/p/x` retry/play/cancel |
+
+### Test results
+
+When the MR's pipeline publishes JUnit reports (`artifacts:reports:junit`),
+the MR page shows a Tests line under the pipeline with the counts. Press
+`T` there, or on a pipeline page, to open the report in a floating pane:
+suites and their tests on the left, the highlighted test's details, output
+and stack trace on the right. It opens on the failures, or on every test
+when nothing failed.
+
+These are the results of the MR's latest pipeline. GitLab's "new failures
+compared to the target branch" view isn't available through the API.
 
 ### Status line
 

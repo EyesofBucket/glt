@@ -113,11 +113,14 @@ func (v *mrDetailView) refresh(a *App, force bool) tea.Cmd {
 			return a.client.ListPipelineJobs(ctx, p, plID)
 		}))
 	}
+	if pl != nil {
+		cmds = append(cmds, fetchTestSummary(a, p, pl, force))
+	}
 	return tea.Batch(cmds...)
 }
 
 func (v *mrDetailView) help() []kb {
-	return []kb{{"p", "pipeline"}, {"n", "run pipeline"}, {"l", "labels"}, {"a", "approve"}, {"m/M", "merge/auto"}, {"R", "rebase"}, {"d", "draft"}, {"c", "comment"}, {"o", "browser"}}
+	return []kb{{"p", "pipeline"}, {"T", "tests"}, {"n", "run pipeline"}, {"l", "labels"}, {"a", "approve"}, {"m/M", "merge/auto"}, {"R", "rebase"}, {"d", "draft"}, {"c", "comment"}, {"o", "browser"}}
 }
 
 func (v *mrDetailView) key(a *App, msg tea.KeyMsg) tea.Cmd {
@@ -170,6 +173,8 @@ func (v *mrDetailView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 		return a.push(newPipelineView(p, mr.HeadPipeline.ID, ""))
 	case "B":
 		return a.push(newPipelineList(p, mr.SourceBranch))
+	case "T":
+		return a.openTests(p, mr.HeadPipeline)
 	case "l":
 		return a.editMRLabels(p, iid, mr.Labels)
 	case "n":
@@ -422,6 +427,11 @@ func (v *mrDetailView) content(a *App, w int) []string {
 		add(a.zone(fit(line, w), zone{click: func(bool) tea.Cmd { return a.push(newPipelineView(p, id, "")) }}))
 		if jobs, _ := get[[]gitlab.Job](a.store, jobsKey(p, pl.ID)); jobs != nil {
 			add(stageChips(jobs, w)...)
+		}
+		if s, _ := get[*gitlab.TestSummary](a.store, testSumKey(p, pl.ID)); s != nil && s.Total.Count > 0 {
+			pl := pl
+			add(a.zone(fit(sHeader.Render("Tests")+"  "+testsFact(a, p, pl.ID), w),
+				zone{click: func(bool) tea.Cmd { return a.openTests(p, pl) }}))
 		}
 	} else {
 		add(sDim.Render("No pipeline yet · n to run one"))

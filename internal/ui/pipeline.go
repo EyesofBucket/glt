@@ -195,7 +195,7 @@ func (v *pipelineView) moved() tea.Cmd {
 }
 
 func (v *pipelineView) help() []kb {
-	return []kb{{"enter", "log"}, {"r", "retry"}, {"p", "play"}, {"x", "cancel"}, {"R/X", "retry/cancel pipeline"}, {"v", "preview"}, {"]/[", "next/prev failed"}}
+	return []kb{{"enter", "log"}, {"r", "retry"}, {"p", "play"}, {"x", "cancel"}, {"R/X", "retry/cancel pipeline"}, {"v", "preview"}, {"T", "tests"}, {"]/[", "next/prev failed"}}
 }
 
 func (v *pipelineView) key(a *App, msg tea.KeyMsg) tea.Cmd {
@@ -242,6 +242,8 @@ func (v *pipelineView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 			return openBrowser(pl.WebURL)
 		}
 		return nil
+	case "T":
+		return a.openTests(p, pl)
 	case "R":
 		return a.action(fmt.Sprintf("retry pipeline #%d", pid), func() error { return a.client.RetryPipeline(bg(), p, pid) }, inval, nil)
 	case "X":
