@@ -60,6 +60,8 @@ func (a *App) mode() (string, lipgloss.Color) {
 	switch o := a.overlay.(type) {
 	case *projectPicker:
 		return "PROJECTS", cGreen
+	case *testsPopup:
+		return "TESTS", cBlue
 	case *chooser:
 		return strings.ToUpper(strings.TrimSpace(strings.TrimPrefix(o.prompt, firstWord(o.prompt)))), cGreen
 	}
