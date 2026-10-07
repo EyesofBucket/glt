@@ -213,8 +213,10 @@ git push origin v0.2.0
 ```
 
 The release workflow tests that commit. GoReleaser (`.goreleaser.yaml`)
-then builds archives for Linux, macOS and Windows on amd64 and arm64, and
-publishes them to a GitHub release with checksums and generated notes.
+then builds plain binaries for Linux, macOS and Windows on amd64 and
+arm64, named `glt-<version>-<os>-<arch>` (with `.exe` on Windows), and
+publishes them to a GitHub release with this README, checksums and
+generated notes.
 Tags with a suffix, such as `v0.2.0-rc.1`, are marked as pre-releases.
 To try the build locally from the dev shell, run
 `goreleaser release --snapshot --clean` (output goes in `dist/`).
