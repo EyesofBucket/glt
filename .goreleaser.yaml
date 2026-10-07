@@ -1,4 +1,4 @@
-# GoReleaser builds the release archives when a version tag is pushed (see
+# GoReleaser builds the release binaries when a version tag is pushed (see
 # .github/workflows/release.yml). Try it locally with:
 #   goreleaser release --snapshot --clean
 version: 2
@@ -17,18 +17,16 @@ builds:
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
 
+# plain binaries, no archives: glt-<version>-<os>-<arch>, plus .exe on
+# Windows (added by GoReleaser)
 archives:
-  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
-    wrap_in_directory: true
-    formats: [tar.gz]
-    format_overrides:
-      - goos: windows
-        formats: [zip]
-    files:
-      - README.md
+  - formats: [binary]
+    name_template: "{{ .ProjectName }}-{{ .Version }}-{{ .Os }}-{{ .Arch }}"
 
 checksum:
   name_template: checksums.txt
+  extra_files:
+    - glob: ./README.md
 
 changelog:
   use: github-native
@@ -36,3 +34,6 @@ changelog:
 release:
   name_template: "glt {{ .Tag }}"
   prerelease: auto
+  # the README is its own asset, next to the binaries
+  extra_files:
+    - glob: ./README.md
