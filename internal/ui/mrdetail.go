@@ -120,7 +120,7 @@ func (v *mrDetailView) refresh(a *App, force bool) tea.Cmd {
 }
 
 func (v *mrDetailView) help() []kb {
-	return []kb{{"p", "pipeline"}, {"T", "tests"}, {"n", "run pipeline"}, {"l", "labels"}, {"a", "approve"}, {"m/M", "merge/auto"}, {"R", "rebase"}, {"d", "draft"}, {"c", "comment"}, {"o", "browser"}}
+	return []kb{{"p", "pipeline"}, {"T", "tests"}, {"n", "run pipeline"}, {"e", "edit"}, {"l", "labels"}, {"a", "approve"}, {"m/M", "merge/auto"}, {"R", "rebase"}, {"d", "draft"}, {"c", "comment"}, {"o", "browser"}}
 }
 
 func (v *mrDetailView) key(a *App, msg tea.KeyMsg) tea.Cmd {
@@ -177,6 +177,8 @@ func (v *mrDetailView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 		return a.openTests(p, mr.HeadPipeline)
 	case "l":
 		return a.editMRLabels(p, iid, mr.Labels)
+	case "e":
+		return a.push(newMREditForm(p, mr))
 	case "n":
 		return v.runPipeline(a, mr)
 	case "o":

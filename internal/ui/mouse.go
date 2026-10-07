@@ -26,7 +26,7 @@ import (
 type zone struct {
 	click  func(double bool) tea.Cmd // nil: swallow clicks
 	scroll func(dir int) tea.Cmd     // nil: fall through to the view
-	layer  int                       // 1 for the picker overlay
+	layer  int                       // 1 for the picker overlay, 2 for the confirm popup
 }
 
 type zoneSeg struct {
@@ -153,7 +153,9 @@ func (a *App) scanLine(l string, y int) string {
 // the topmost layer that's showing.
 func (a *App) zonesAt(x, y int) []int {
 	layer := 0
-	if a.overlay != nil {
+	if a.confirming() {
+		layer = 2
+	} else if a.overlay != nil {
 		layer = 1
 	}
 	var hits []zoneSeg
@@ -226,13 +228,11 @@ func (a *App) mouse(msg tea.MouseMsg) tea.Cmd {
 func (a *App) click(x, y int) tea.Cmd {
 	ids := a.zonesAt(x, y)
 	if len(ids) == 0 {
-		// clicking outside an overlay dismisses it
-		if a.overlay != nil {
+		// clicking outside an overlay dismisses it (but not the confirm
+		// popup, which needs an answer)
+		if a.overlay != nil && !a.confirming() {
 			return a.overlay.key(a, tea.KeyMsg{Type: tea.KeyEsc})
 		}
-		return nil
-	}
-	if a.modal != nil && a.modal.input == nil {
 		return nil
 	}
 	id := ids[0]

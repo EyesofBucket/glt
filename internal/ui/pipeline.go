@@ -340,10 +340,6 @@ func (v *pipelineView) render(a *App, w, h int) string {
 
 	cells := make([][]string, len(rows))
 	for i, j := range rows {
-		stage := ""
-		if i == 0 || rows[i-1].Stage != j.Stage {
-			stage = j.Stage
-		}
 		name := j.Name
 		if j.IsBridge {
 			name = "⇢ " + name
@@ -358,7 +354,7 @@ func (v *pipelineView) render(a *App, w, h int) string {
 		if j.Runner != nil {
 			runner = j.Runner.Description
 		}
-		cells[i] = []string{sStage.Render(stage), statusLabel(j.Status, j.AllowFailure), name,
+		cells[i] = []string{sStage.Render(j.Stage), statusLabel(j.Status, j.AllowFailure), name,
 			sDim.Render(elapsed(j.Status, j.StartedAt, j.FinishedAt, j.Duration)), sDim.Render(runner), sDim.Render(strconv.Itoa(j.ID))}
 	}
 	t := newTable([]col{
@@ -369,12 +365,7 @@ func (v *pipelineView) render(a *App, w, h int) string {
 
 	start, end := v.l.window(len(rows), listH-1)
 	for i := start; i < end; i++ {
-		c := cells[i]
-		if i == start && c[0] == "" {
-			// keep the stage visible at the top of a scrolled list
-			c = append([]string{sStage.Render(rows[i].Stage)}, c[1:]...)
-		}
-		line := t.row(c...)
+		line := t.row(cells[i]...)
 		if i == v.l.cursor {
 			line = selectLine(line, w)
 		}

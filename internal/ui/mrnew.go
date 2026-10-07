@@ -15,12 +15,14 @@ import (
 	"gitlab-tui/internal/gitlab"
 )
 
-// mrNewView is the form for opening a merge request. The title and
-// description are filled in from the commits (or the project's MR
-// template) until the user edits them.
+// mrNewView is the form for opening a merge request, or for editing one
+// (when orig is set). When opening one, the title and description are
+// filled in from the commits (or the project's MR template) until the user
+// edits them.
 type mrNewView struct {
 	project        string
 	source, target string
+	orig           *gitlab.MR // the MR being edited
 
 	titleIn     textinput.Model
 	desc        textarea.Model
@@ -31,12 +33,14 @@ type mrNewView struct {
 	tmplChosen  bool   // default template decided
 
 	labels    []string
+	assignees []gitlab.User // editing; a new MR has assignMe instead
 	reviewers []gitlab.User
 
 	assignMe, draft, removeSource, squash bool
 	defaultsSet                           bool
 
 	focus      int
+	typing     bool // the cursor is in the title or description
 	lastSubmit time.Time
 }
 
@@ -47,6 +51,7 @@ const (
 	fTitle
 	fDesc
 	fLabels
+	fAssignees
 	fReviewers
 	fAssign
 	fDraft
@@ -71,22 +76,64 @@ func newMRForm(project, source string) *mrNewView {
 		v.focus = fSource
 	} else {
 		v.focus = fTitle
-		v.titleIn.Focus()
 	}
 	return v
+}
+
+// newMREditForm edits an existing MR.
+func newMREditForm(project string, mr *gitlab.MR) *mrNewView {
+	v := newMRForm(project, mr.SourceBranch)
+	v.orig = mr
+	v.target = mr.TargetBranch
+	v.titleIn.SetValue(strings.TrimSpace(draftRe.ReplaceAllString(mr.Title, "")))
+	v.titleIn.CursorEnd()
+	v.desc.SetValue(mr.Description)
+	v.labels = append([]string(nil), mr.Labels...)
+	v.assignees = append([]gitlab.User(nil), mr.Assignees...)
+	v.reviewers = append([]gitlab.User(nil), mr.Reviewers...)
+	v.draft, v.removeSource, v.squash = mr.Draft, mr.RemoveSourceBranch, mr.Squash
+	v.defaultsSet, v.tmplChosen = true, true
+	return v
+}
+
+func (v *mrNewView) editing() bool { return v.orig != nil }
+
+// fields lists the form's fields in tab order.
+func (v *mrNewView) fields() []int {
+	if v.editing() {
+		return []int{fTitle, fTarget, fLabels, fAssignees, fReviewers, fDraft, fRemove, fSquash, fDesc, fCreate}
+	}
+	return []int{fTitle, fSource, fTarget, fTemplate, fLabels, fReviewers, fAssign, fDraft, fRemove, fSquash, fDesc, fCreate}
+}
+
+// step moves the focus d fields along, wrapping around.
+func (v *mrNewView) step(d int) tea.Cmd {
+	fs := v.fields()
+	i := 0
+	for j, f := range fs {
+		if f == v.focus {
+			i = j
+		}
+	}
+	return v.setFocus(fs[((i+d)%len(fs)+len(fs))%len(fs)])
 }
 
 // NewMRForm opens the create-merge-request form, with source preselected
 // if it's not empty.
 func NewMRForm(project, source string) View { return newMRForm(project, source) }
 
-func (v *mrNewView) title() string { return "new merge request" }
+func (v *mrNewView) title() string {
+	if v.editing() {
+		return fmt.Sprintf("edit !%d", v.orig.IID)
+	}
+	return "new merge request"
+}
 
 func (v *mrNewView) proj() string { return v.project }
 
-// capturing: the form has text fields, so q and friends are typed, not
+// capturing: while typing in a text field, q and friends are typed, not
 // global shortcuts.
-func (v *mrNewView) capturing() bool { return true }
+func (v *mrNewView) capturing() bool { return v.typing }
 
 func projInfoKey(p string) string          { return "projinfo:" + p }
 func branchesKey(p string) string          { return "branches:" + p }
@@ -99,6 +146,9 @@ const meKey = "me"
 
 func (v *mrNewView) refresh(a *App, force bool) tea.Cmd {
 	p := v.project
+	if v.editing() {
+		return fetchLabels(a, p, 10*time.Minute)
+	}
 	age := func(d time.Duration) time.Duration {
 		if force {
 			return 0
@@ -207,70 +257,138 @@ func humanizeBranch(b string) string {
 }
 
 func (v *mrNewView) help() []kb {
-	return []kb{{"tab", "next field"}, {"enter", "choose/toggle"}, {"ctrl+s", "create"}, {"esc", "cancel"}}
+	save := "create"
+	if v.editing() {
+		save = "save"
+	}
+	if v.typing {
+		h := []kb{{"esc", "done editing"}}
+		if v.focus == fDesc {
+			h = append(h, kb{"ctrl+e", "$EDITOR"})
+		}
+		return append(h, kb{"ctrl+s", save})
+	}
+	h := []kb{{"j/k", "move"}, {"enter", "edit/choose/toggle"}}
+	if v.focus == fDesc {
+		h = append(h, kb{"ctrl+e", "$EDITOR"})
+	}
+	return append(h, kb{"ctrl+s", save}, kb{"esc", "cancel"})
 }
 
+func isTextField(f int) bool { return f == fTitle || f == fDesc }
+
+// setFocus moves to field f, leaving any text field being typed in.
 func (v *mrNewView) setFocus(f int) tea.Cmd {
-	v.focus = (f + nFields) % nFields
+	v.focus = f
+	v.typing = false
 	v.titleIn.Blur()
 	v.desc.Blur()
+	return nil
+}
+
+// startTyping puts the cursor in the focused text field.
+func (v *mrNewView) startTyping() tea.Cmd {
+	v.typing = true
 	switch v.focus {
 	case fTitle:
 		return v.titleIn.Focus()
 	case fDesc:
 		return v.desc.Focus()
 	}
+	v.typing = false
 	return nil
 }
 
-func (v *mrNewView) dirty() bool { return v.titleEdited || v.descEdited }
+func (v *mrNewView) dirty() bool {
+	if v.editing() {
+		return len(v.changes()) > 0
+	}
+	return v.titleEdited || v.descEdited
+}
 
+// guardLeave asks before going back with unsaved changes.
+func (v *mrNewView) guardLeave(a *App) bool {
+	if !v.dirty() {
+		return false
+	}
+	q := "Discard this merge request?"
+	if v.editing() {
+		q = "Discard your changes?"
+	}
+	a.confirm(q, func() tea.Cmd { return a.pop() })
+	return true
+}
+
+// key: the form starts out navigating, so j/k move between fields; enter
+// on the title or description starts typing there and esc stops.
 func (v *mrNewView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 	switch msg.String() {
+	case "ctrl+s":
+		v.setFocus(v.focus)
+		return v.submit(a)
+	case "ctrl+e":
+		if v.focus == fDesc {
+			return a.editText(v.desc.Value(), func(text string) tea.Cmd {
+				if text != v.desc.Value() {
+					v.desc.SetValue(text)
+					v.descEdited = true
+				}
+				return nil
+			})
+		}
+	}
+	if v.typing {
+		switch msg.String() {
+		case "esc":
+			return v.setFocus(v.focus)
+		case "tab":
+			return v.step(1)
+		case "shift+tab":
+			return v.step(-1)
+		}
+		switch v.focus {
+		case fTitle:
+			if msg.String() == "enter" {
+				return v.setFocus(v.focus)
+			}
+			before := v.titleIn.Value()
+			var cmd tea.Cmd
+			v.titleIn, cmd = v.titleIn.Update(msg)
+			if v.titleIn.Value() != before {
+				v.titleEdited = true
+			}
+			return cmd
+		case fDesc:
+			before := v.desc.Value()
+			var cmd tea.Cmd
+			v.desc, cmd = v.desc.Update(msg)
+			if v.desc.Value() != before {
+				v.descEdited = true
+			}
+			return cmd
+		}
+		return nil
+	}
+	fs := v.fields()
+	switch msg.String() {
+	case "j", "down", "tab", "ctrl+n":
+		return v.step(1)
+	case "k", "up", "shift+tab", "ctrl+p":
+		return v.step(-1)
+	case "g", "home":
+		return v.setFocus(fs[0])
+	case "G", "end":
+		return v.setFocus(fs[len(fs)-1])
+	case "enter", " ", "i", "l", "right":
+		if isTextField(v.focus) {
+			return v.startTyping()
+		}
+		return v.activate(a, v.focus)
 	case "esc":
-		if v.dirty() {
-			a.confirm("Discard this merge request?", func() tea.Cmd { return a.pop() })
+		if v.guardLeave(a) {
 			return nil
 		}
 		return a.pop()
-	case "ctrl+s":
-		return v.submit(a)
-	case "tab":
-		return v.setFocus(v.focus + 1)
-	case "shift+tab":
-		return v.setFocus(v.focus - 1)
-	}
-	if v.focus != fDesc {
-		switch msg.String() {
-		case "down":
-			return v.setFocus(v.focus + 1)
-		case "up":
-			return v.setFocus(v.focus - 1)
-		}
-	}
-	switch v.focus {
-	case fTitle:
-		if msg.String() == "enter" {
-			return v.setFocus(v.focus + 1)
-		}
-		before := v.titleIn.Value()
-		var cmd tea.Cmd
-		v.titleIn, cmd = v.titleIn.Update(msg)
-		if v.titleIn.Value() != before {
-			v.titleEdited = true
-		}
-		return cmd
-	case fDesc:
-		before := v.desc.Value()
-		var cmd tea.Cmd
-		v.desc, cmd = v.desc.Update(msg)
-		if v.desc.Value() != before {
-			v.descEdited = true
-		}
-		return cmd
-	}
-	if s := msg.String(); s == "enter" || s == " " {
-		return v.activate(a, v.focus)
 	}
 	return nil
 }
@@ -306,8 +424,10 @@ func (v *mrNewView) activate(a *App, f int) tea.Cmd {
 			v.labels = chosen
 			return nil
 		})
+	case fAssignees:
+		return a.chooseMembers(p, "Assignees", v.assignees, func(us []gitlab.User) { v.assignees = us })
 	case fReviewers:
-		return a.chooseReviewers(p, v.reviewers, func(us []gitlab.User) { v.reviewers = us })
+		return a.chooseMembers(p, "Reviewers", v.reviewers, func(us []gitlab.User) { v.reviewers = us })
 	case fAssign:
 		v.assignMe = !v.assignMe
 	case fDraft:
@@ -323,6 +443,9 @@ func (v *mrNewView) activate(a *App, f int) tea.Cmd {
 }
 
 func (v *mrNewView) submit(a *App) tea.Cmd {
+	if v.editing() {
+		return v.save(a)
+	}
 	title := strings.TrimSpace(v.titleIn.Value())
 	switch {
 	case v.source == "":
@@ -375,6 +498,109 @@ func (v *mrNewView) submit(a *App) tea.Cmd {
 	})
 }
 
+// changes lists the edited MR's fields that differ from what it had, as
+// the API wants them.
+func (v *mrNewView) changes() map[string]any {
+	mr := v.orig
+	out := map[string]any{}
+	title := strings.TrimSpace(v.titleIn.Value())
+	if v.draft {
+		title = "Draft: " + title
+	}
+	// only send the title if it or the draft state changed, keeping the
+	// MR's own draft spelling ("[Draft]", "Draft -") otherwise
+	bare := strings.TrimSpace(draftRe.ReplaceAllString(mr.Title, ""))
+	if v.draft != mr.Draft || strings.TrimSpace(v.titleIn.Value()) != bare {
+		out["title"] = title
+	}
+	if v.desc.Value() != mr.Description {
+		out["description"] = v.desc.Value()
+	}
+	if v.target != mr.TargetBranch {
+		out["target_branch"] = v.target
+	}
+	if !sameStrings(v.labels, mr.Labels) {
+		out["labels"] = strings.Join(v.labels, ",")
+	}
+	if ids, changed := userIDs(v.assignees, mr.Assignees); changed {
+		out["assignee_ids"] = ids
+	}
+	if ids, changed := userIDs(v.reviewers, mr.Reviewers); changed {
+		out["reviewer_ids"] = ids
+	}
+	if v.removeSource != mr.RemoveSourceBranch {
+		out["remove_source_branch"] = v.removeSource
+	}
+	if v.squash != mr.Squash {
+		out["squash"] = v.squash
+	}
+	return out
+}
+
+func sameStrings(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	seen := map[string]bool{}
+	for _, x := range a {
+		seen[x] = true
+	}
+	for _, x := range b {
+		if !seen[x] {
+			return false
+		}
+	}
+	return true
+}
+
+// userIDs gives the IDs to send for now, and whether they differ from was.
+// GitLab clears the list when sent [0].
+func userIDs(now, was []gitlab.User) ([]int, bool) {
+	ids := []int{}
+	set := map[int]bool{}
+	for _, u := range now {
+		ids = append(ids, u.ID)
+		set[u.ID] = true
+	}
+	changed := len(now) != len(was)
+	for _, u := range was {
+		if !set[u.ID] {
+			changed = true
+		}
+	}
+	if len(ids) == 0 {
+		ids = []int{0}
+	}
+	return ids, changed
+}
+
+func (v *mrNewView) save(a *App) tea.Cmd {
+	if strings.TrimSpace(v.titleIn.Value()) == "" {
+		a.setFlash("the title is empty", true)
+		return v.setFocus(fTitle)
+	}
+	if time.Since(v.lastSubmit) < 5*time.Second {
+		return nil
+	}
+	fields := v.changes()
+	if len(fields) == 0 {
+		a.setFlash("nothing changed", false)
+		return a.pop()
+	}
+	v.lastSubmit = time.Now()
+	p, iid := v.project, v.orig.IID
+	inval := append([]string{mrKey(p, iid), apprKey(p, iid), dashKey}, a.keysWithPrefix(mrListPrefix(p))...)
+	return a.action(fmt.Sprintf("update !%d", iid), func() error {
+		_, err := a.client.UpdateMR(bg(), p, iid, fields)
+		return err
+	}, inval, func(a *App) tea.Cmd {
+		if a.top() == view(v) {
+			return a.pop()
+		}
+		return nil
+	})
+}
+
 func (v *mrNewView) render(a *App, w, h int) string {
 	p := v.project
 	// label column: caret, the longest label, then the column gap
@@ -386,16 +612,20 @@ func (v *mrNewView) render(a *App, w, h int) string {
 
 	row := func(f int, label, value string) {
 		head := "  " + sDim.Render(pad(label, labelW)) + colGap
+		if f < 0 {
+			add(pad(head+value, w))
+			return
+		}
 		if v.focus == f {
 			head = sActive.Render(ic.caret+" ") + sActiveT.Render(pad(label, labelW)) + colGap
 		}
 		line := head + value
 		add(a.zone(pad(line, w), zone{click: func(bool) tea.Cmd {
-			cmd := v.setFocus(f)
-			if f != fTitle && f != fDesc {
-				return tea.Batch(cmd, v.activate(a, f))
+			v.setFocus(f)
+			if isTextField(f) {
+				return v.startTyping()
 			}
-			return cmd
+			return v.activate(a, f)
 		}}))
 	}
 	branch := func(b string) string {
@@ -411,36 +641,32 @@ func (v *mrNewView) render(a *App, w, h int) string {
 		return sDim.Render(ic.unchecked)
 	}
 
-	add(sTitle.Render("New merge request")+sDim.Render(" in "+p), "")
-	row(fSource, "Source branch", branch(v.source))
-	row(fTarget, "Target branch", branch(v.target))
-	add(strings.Repeat(" ", lw) + v.status(a))
-	tmpl := sDim.Render("none")
-	if v.template != "" {
-		tmpl = v.template + sDim.Render("  ▾")
-	} else if ts, _ := get[[]gitlab.Template](a.store, mrTemplatesKey(p)); len(ts) > 0 {
-		tmpl = sDim.Render(fmt.Sprintf("none (%d available)  ▾", len(ts)))
+	titleRow := func() {
+		v.titleIn.Width = vw - 1
+		row(fTitle, "Title", v.titleIn.View())
+		add("")
 	}
-	row(fTemplate, "Template", tmpl)
-	add("")
-
-	v.titleIn.Width = vw - 1
-	row(fTitle, "Title", v.titleIn.View())
-	add("")
-
-	// the description takes whatever height the other rows leave
-	descH := max(3, h-len(L)-9)
-	v.desc.SetWidth(vw)
-	v.desc.SetHeight(descH)
-	descLines := strings.Split(v.desc.View(), "\n")
-	for i, dl := range descLines {
-		if i == 0 {
-			row(fDesc, "Description", dl)
-		} else {
-			add(a.zone(strings.Repeat(" ", lw)+dl, zone{click: func(bool) tea.Cmd { return v.setFocus(fDesc) }}))
+	if v.editing() {
+		add(sTitle.Render(fmt.Sprintf("Edit !%d", v.orig.IID))+sDim.Render(" in "+p), "")
+		titleRow()
+		row(-1, "Source branch", sKey.Render(v.source)+sDim.Render("  (can't be changed)"))
+		row(fTarget, "Target branch", branch(v.target))
+		add("")
+	} else {
+		add(sTitle.Render("New merge request")+sDim.Render(" in "+p), "")
+		titleRow()
+		row(fSource, "Source branch", branch(v.source))
+		row(fTarget, "Target branch", branch(v.target))
+		add(strings.Repeat(" ", lw) + v.status(a))
+		tmpl := sDim.Render("none")
+		if v.template != "" {
+			tmpl = v.template + sDim.Render("  ▾")
+		} else if ts, _ := get[[]gitlab.Template](a.store, mrTemplatesKey(p)); len(ts) > 0 {
+			tmpl = sDim.Render(fmt.Sprintf("none (%d available)  ▾", len(ts)))
 		}
+		row(fTemplate, "Template", tmpl)
+		add("")
 	}
-	add("")
 
 	labels := sDim.Render("none")
 	if len(v.labels) > 0 {
@@ -448,27 +674,48 @@ func (v *mrNewView) render(a *App, w, h int) string {
 		labels = labelChips(v.labels, known)
 	}
 	row(fLabels, "Labels", fit(labels, vw))
-	revs := sDim.Render("none")
-	if len(v.reviewers) > 0 {
+	people := func(us []gitlab.User) string {
+		if len(us) == 0 {
+			return sDim.Render("none")
+		}
 		var names []string
-		for _, u := range v.reviewers {
+		for _, u := range us {
 			names = append(names, "@"+u.Username)
 		}
-		revs = strings.Join(names, " ")
+		return fit(strings.Join(names, " "), vw)
 	}
-	row(fReviewers, "Reviewers", fit(revs, vw))
-	row(fAssign, "Assign to me", check(v.assignMe))
+	if v.editing() {
+		row(fAssignees, "Assignees", people(v.assignees))
+		row(fReviewers, "Reviewers", people(v.reviewers))
+	} else {
+		row(fReviewers, "Reviewers", people(v.reviewers))
+		row(fAssign, "Assign to me", check(v.assignMe))
+	}
 	row(fDraft, "Draft", check(v.draft))
 	row(fRemove, "Delete source branch", check(v.removeSource)+sDim.Render("  when merged"))
 	row(fSquash, "Squash commits", check(v.squash)+sDim.Render("  when merged"))
 	add("")
-	btn := " Create merge request "
-	if v.focus == fCreate {
-		btn = sActiveT.Reverse(true).Render(btn)
-	} else {
-		btn = sKey.Render("[" + btn + "]")
+	// the description is last, taking the height left above the button
+	descH := max(3, h-len(L)-2)
+	v.desc.SetWidth(vw)
+	v.desc.SetHeight(descH)
+	descLines := strings.Split(v.desc.View(), "\n")
+	for i, dl := range descLines {
+		if i == 0 {
+			row(fDesc, "Description", dl)
+		} else if i == 1 {
+			hint := pad(sDim.Render("  ctrl+e: $EDITOR"), lw)
+			add(a.zone(hint+dl, zone{click: func(bool) tea.Cmd { v.setFocus(fDesc); return v.startTyping() }}))
+		} else {
+			add(a.zone(strings.Repeat(" ", lw)+dl, zone{click: func(bool) tea.Cmd { v.setFocus(fDesc); return v.startTyping() }}))
+		}
 	}
-	row(fCreate, "", btn+sDim.Render("  ctrl+s"))
+	add("")
+	btn := "Create merge request"
+	if v.editing() {
+		btn = "Save changes"
+	}
+	row(fCreate, "", button(btn, v.focus == fCreate)+sDim.Render("  ctrl+s"))
 	return strings.Join(L, "\n")
 }
 
@@ -551,14 +798,14 @@ func (a *App) chooseBranch(project, title string, extra []choice, initial string
 	}, nil)
 }
 
-// chooseReviewers opens a multi-select over the project's members.
-func (a *App) chooseReviewers(project string, current []gitlab.User, done func([]gitlab.User)) tea.Cmd {
+// chooseMembers opens a multi-select over the project's members.
+func (a *App) chooseMembers(project, title string, current []gitlab.User, done func([]gitlab.User)) tea.Cmd {
 	var ids []string
 	for _, u := range current {
 		ids = append(ids, strconv.Itoa(u.ID))
 	}
 	return a.openChooser(&chooser{
-		title:  "Reviewers",
+		title:  title,
 		prompt: ic.user + " Members",
 		multi:  true,
 		load: func(a *App, force bool) tea.Cmd {

@@ -98,12 +98,22 @@ Press `?` in any view. The main ones:
 | label editor | type to filter, `ctrl+d/u` half page, `tab` or click to toggle, `enter` save, `esc` cancel |
 | picker | type to filter, `ctrl+n/p` move, `ctrl+d/u` half page, `enter` open (in the tree, expands a group), `ctrl+t` tree/list view, `←/→` collapse/expand, `ctrl+o` browser, `ctrl+y` copy URL, `esc` close |
 | MR list | `enter` open, `p` pipeline, `tab`/`1-5` all open/mine/review requested/merged/closed, `c` new MR, `B` your branch's pipelines |
-| new MR | `tab`/`↑↓` move between fields, `enter` choose branch/template/labels/reviewers or toggle, `ctrl+s` create, `esc` cancel |
-| MR | `p` pipeline, `T` test results, `n` run a new pipeline, `l` edit labels, `a` approve/unapprove, `m` merge, `M` auto-merge, `R` rebase, `d` toggle draft, `c` comment |
+| new/edit MR | `j/k`/`tab` move between fields, `enter` type in the title or description (`esc` stops typing) or choose branch/template/labels/people or toggle, `ctrl+e` write the description in your editor, `ctrl+s` create/save, `esc`/`q` cancel |
+| MR | `p` pipeline, `T` test results, `e` edit (target, title, description, labels, assignees, reviewers, draft, merge options), `n` run a new pipeline, `l` edit labels, `a` approve/unapprove, `m` merge, `M` auto-merge, `R` rebase, `d` toggle draft, `c` comment (`ctrl+e` writes it in your editor) |
 | pipeline list | `enter` open, `b` pick a branch (your checked-out one first, or all branches), `n` run a pipeline, `R`/`X` retry/cancel, `/` search |
 | pipeline | `enter` log (or downstream pipeline), `r` retry job, `p` play manual job, `x` cancel job, `R`/`X` retry/cancel pipeline, `]/[` next/prev failed job, `v` toggle log preview, `T` test results |
 | test results | `f` failed/all/skipped, `/` search, `enter` fold a suite or read a test's output, `tab` switch to the output, `]/[` next/prev failure, `z` fold all, `J` the suite's job log, `y` copy output, `o` the Tests tab in the browser, `esc` close |
 | log | `f` follow, `w` wrap, `T` timestamps, `#` line numbers, `/` `n` `N` search, `[ ]` jump between sections, `h/l` scroll sideways, `r/p/x` retry/play/cancel |
+
+### Writing in your editor
+
+`ctrl+e` in an MR description or a comment opens the text in your editor
+and puts what you save back into the field to send. glt uses the editor
+git uses for commit messages: `GIT_EDITOR`, `core.editor`, `VISUAL`, then
+`EDITOR`, falling back to `vi` (Notepad on Windows). Editors that open a
+window need their wait flag, e.g. `code --wait`, and Notepad++ needs
+`-multiInst -nosession`; Git for Windows' installer sets these up when you
+pick an editor. On Windows, quote paths that contain spaces.
 
 ### Test results
 
@@ -204,7 +214,7 @@ After changing dependencies, update `vendorHash` in `flake.nix`. Set it to
 
 ## Releasing
 
-CI tests every branch push and pull request. To make a release, tag the
+CI tests pull requests and pushes to `main`. To make a release, tag the
 commit with a version and push the tag:
 
 ```sh
