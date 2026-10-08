@@ -43,6 +43,8 @@ var (
 	sActiveT  lipgloss.Style
 	sMatch    lipgloss.Style
 	sSection  lipgloss.Style
+	sDirect   lipgloss.Style // a selected job's own dependency lines
+	sIndirect lipgloss.Style // and those further up- and downstream
 	sBrand    lipgloss.Style
 	sTabOn    lipgloss.Style
 	sTabOff   lipgloss.Style
@@ -101,6 +103,8 @@ func applyTheme(t Theme) {
 	sActiveT = lipgloss.NewStyle().Foreground(cBlue).Bold(true)
 	sMatch = lipgloss.NewStyle().Foreground(cBlue).Bold(true)
 	sSection = lipgloss.NewStyle().Foreground(cCyan).Bold(true)
+	sDirect = lipgloss.NewStyle().Foreground(cCyan).Bold(true)
+	sIndirect = lipgloss.NewStyle().Foreground(cBlue)
 	sBrand = lipgloss.NewStyle().Foreground(cMagenta)
 	sTabOn = lipgloss.NewStyle().Foreground(cBlue).Bold(true).Underline(true)
 	sTabOff = lipgloss.NewStyle().Foreground(cGray)

@@ -10,6 +10,7 @@ A fast terminal UI for GitLab merge requests and pipelines.
 - Create, edit, approve, merge, and rebase MRs, edit labels, and comment
 - Pipelines and job logs that update live, with retry, play, and cancel
 - Test results from JUnit reports
+- Job dependency graph, with each matrix job and each dependency line shown separately
 - Themes, mouse support, and drag-to-copy
 - Instant startup from a local cache
 - Linux, macOS, and Windows
