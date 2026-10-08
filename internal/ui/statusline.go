@@ -62,6 +62,8 @@ func (a *App) mode() (string, lipgloss.Color) {
 		return "PROJECTS", cGreen
 	case *testsPopup:
 		return "TESTS", cBlue
+	case *depsPopup:
+		return "DEPENDENCIES", cBlue
 	case *chooser:
 		return strings.ToUpper(strings.TrimSpace(strings.TrimPrefix(o.prompt, firstWord(o.prompt)))), cGreen
 	}

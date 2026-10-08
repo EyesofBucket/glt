@@ -786,3 +786,67 @@ func (c *Client) TestReport(ctx context.Context, project string, pipeline int) (
 	var r TestReport
 	return &r, c.get(ctx, fmt.Sprintf("/projects/%s/pipelines/%d/test_report", pid(project), pipeline), nil, &r)
 }
+
+// JobNeeds maps each of a pipeline's jobs to the jobs it waits for: its
+// needs, or for jobs without needs, the jobs of the stage before. Matrix
+// jobs come back individually. project is a path or a numeric ID.
+func (c *Client) JobNeeds(ctx context.Context, project string, pipelineIID int) (map[string][]string, error) {
+	const fields = `pipeline(iid: $iid) { jobs(first: 100, after: $after, retried: false) {
+		pageInfo { hasNextPage endCursor }
+		nodes { name previousStageJobsOrNeeds { nodes { ... on CiBuildNeed { name } ... on CiJob { name } } } } } }`
+	q := `query($p: ID!, $iid: ID!, $after: String) { project(fullPath: $p) { ` + fields + ` } }`
+	vars := map[string]any{"p": project, "iid": strconv.Itoa(pipelineIID)}
+	if _, err := strconv.Atoi(project); err == nil {
+		q = `query($p: [ID!], $iid: ID!, $after: String) { projects(ids: $p) { nodes { ` + fields + ` } } }`
+		vars["p"] = []string{"gid://gitlab/Project/" + project}
+	}
+	type page struct {
+		Pipeline *struct {
+			Jobs struct {
+				PageInfo struct {
+					HasNextPage bool   `json:"hasNextPage"`
+					EndCursor   string `json:"endCursor"`
+				} `json:"pageInfo"`
+				Nodes []struct {
+					Name  string `json:"name"`
+					Needs struct {
+						Nodes []struct {
+							Name string `json:"name"`
+						} `json:"nodes"`
+					} `json:"previousStageJobsOrNeeds"`
+				} `json:"nodes"`
+			} `json:"jobs"`
+		} `json:"pipeline"`
+	}
+	needs := map[string][]string{}
+	for {
+		var out struct {
+			Project  *page `json:"project"`
+			Projects struct {
+				Nodes []page `json:"nodes"`
+			} `json:"projects"`
+		}
+		if err := c.graphql(ctx, q, vars, &out); err != nil {
+			return nil, err
+		}
+		pg := out.Project
+		if pg == nil && len(out.Projects.Nodes) > 0 {
+			pg = &out.Projects.Nodes[0]
+		}
+		if pg == nil || pg.Pipeline == nil {
+			return nil, fmt.Errorf("pipeline not found")
+		}
+		jobs := pg.Pipeline.Jobs
+		for _, n := range jobs.Nodes {
+			deps := []string{}
+			for _, d := range n.Needs.Nodes {
+				deps = append(deps, d.Name)
+			}
+			needs[n.Name] = deps
+		}
+		if !jobs.PageInfo.HasNextPage {
+			return needs, nil
+		}
+		vars["after"] = jobs.PageInfo.EndCursor
+	}
+}
