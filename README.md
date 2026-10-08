@@ -139,21 +139,20 @@ to `pkgs.lib.fakeHash`, run `nix build`, and copy the hash from the
 ## AI Disclosure
 
 With the exception of small adjustments and this disclosure section, this
-project is written using AI. I understand that, for many, this may be
-off-putting. I'm currently experimenting, not only with AI's ability to write
-code, but also with my own line in regard to to the extent to which I use AI,
-both for work and personal ventures. If the extent to which AI is used in this
-project is outside what you are comfortable with, not only do I understand, but
-I may even agree with you.
+project is written using AI. I'm currently experimenting with AI's ability to
+write code, but also with my own ethical boundaries in regard to my usage of
+AI, both for work and personal ventures. If the extent to which AI is used in
+this project is outside what you are comfortable with, not only do I
+understand, but I may even agree with you.
 
 I try my best to guide agents towards a certain standard of quality and best
 practice, and I only release this to the public because I find value in it and
 want to make it available for those who might also find it useful.
 
-I also refuse to accept praise for any AI-written projects published by me, but
-I openly accept critique. I see AI as a tool. If a carpenter uses a machine to
-smooth a piece of lumber, they should not boast about how smooth they got the
-board. "I just used the machine.", they should say, but if the board isn't
-smooth, they should not blame the machine, but themselves for not properly
-checking the machine's work. I take the same approach to the authorship of this
-project.
+I see AI as a tool. If a carpenter uses a machine to smooth a piece of lumber,
+they should not boast about how smooth they got the board. "I just used the
+machine.", they should say, but if the board isn't smooth, they should not
+blame the machine, but themselves for not properly checking the machine's work.
+I take the same approach to the authorship of this project.
+
+Feel free to submit any issues without worry of me blaming the tools I use.
