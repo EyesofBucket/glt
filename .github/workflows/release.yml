@@ -1,7 +1,7 @@
 name: Release
 
-# Pushing a version tag tests that commit, then GoReleaser builds and
-# publishes the release:
+# Pushing a version tag checks it matches VERSION, tests that commit, then
+# GoReleaser builds and publishes the release:
 #   git tag v0.2.0 && git push origin v0.2.0
 on:
   push:
@@ -12,7 +12,21 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  version:
+    name: Check VERSION
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Tag matches VERSION
+        run: |
+          want="v$(cat VERSION)"
+          if [ "$GITHUB_REF_NAME" != "$want" ]; then
+            echo "::error::tag $GITHUB_REF_NAME doesn't match VERSION ($want)"
+            exit 1
+          fi
+
   ci:
+    needs: version
     uses: ./.github/workflows/ci.yml
 
   release:

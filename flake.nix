@@ -10,7 +10,10 @@
     flake-utils.lib.eachDefaultSystem (system:
       let
         pkgs = nixpkgs.legacyPackages.${system};
-        version = "0.1.0";
+        # VERSION is the last release. Builds add the commit's date and hash,
+        # since a flake can't see tags and the tree may be past the release.
+        rev = self.shortRev or self.dirtyShortRev or "unknown";
+        version = "${pkgs.lib.fileContents ./VERSION}+${builtins.substring 0 8 self.lastModifiedDate}.${rev}";
         # the native package rebuilt for another OS/arch with Go's own
         # cross-compiler; the binary ends up at $out/bin/glt(.exe)
         crossBuild = goos: goarch: self.packages.${system}.glt.overrideAttrs (old: {
