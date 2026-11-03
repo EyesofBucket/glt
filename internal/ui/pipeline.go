@@ -21,10 +21,13 @@ type pipelineView struct {
 	moving  bool // cursor moved, preview fetch pending debounce
 	flipped bool // preview toggled away from the configured default
 	pvJob   int
+	// jobs whose logs are shown side by side, by name so a watch follows
+	// retries and new pipelines on the branch
+	watch map[string]bool
 }
 
 func newPipelineView(project string, id int, branch string) *pipelineView {
-	return &pipelineView{project: project, id: id, branch: branch, l: newListState()}
+	return &pipelineView{project: project, id: id, branch: branch, l: newListState(), watch: map[string]bool{}}
 }
 
 // NewPipeline opens pipeline id, or (id == 0) the latest pipeline for
@@ -134,18 +137,50 @@ func (v *pipelineView) refresh(a *App, force bool) tea.Cmd {
 	if sel := v.selected(a); sel != nil && !v.moving {
 		v.pvJob = sel.ID
 	}
-	if v.preview(a) && v.pvJob != 0 {
-		if j := v.job(a, v.pvJob); j != nil && !j.IsBridge {
-			t := a.store.traces[traceKey(p, j.ID)]
-			if tAge, ok := traceMaxAge(j, t); ok {
-				if force {
-					tAge = 0
-				}
-				cmds = append(cmds, fetchTrace(a.store, a.client, p, j.ID, tAge))
+	for _, j := range v.logJobs(a) {
+		if j.IsBridge {
+			continue
+		}
+		t := a.store.traces[traceKey(p, j.ID)]
+		if tAge, ok := traceMaxAge(&j, t); ok {
+			if force {
+				tAge = 0
 			}
+			cmds = append(cmds, fetchTrace(a.store, a.client, p, j.ID, tAge))
 		}
 	}
 	return tea.Batch(cmds...)
+}
+
+// watched lists the watched jobs in pipeline order.
+func (v *pipelineView) watched(a *App) []gitlab.Job {
+	if len(v.watch) == 0 {
+		return nil
+	}
+	jobs, _ := get[[]gitlab.Job](a.store, jobsKey(v.project, v.id))
+	var out []gitlab.Job
+	for _, g := range groupStages(jobs) {
+		for _, j := range g.jobs {
+			if v.watch[j.Name] {
+				out = append(out, j)
+			}
+		}
+	}
+	return out
+}
+
+// logJobs are the jobs whose logs are on screen: the watched ones, or
+// else the previewed one.
+func (v *pipelineView) logJobs(a *App) []gitlab.Job {
+	if ws := v.watched(a); len(ws) > 0 {
+		return ws
+	}
+	if v.preview(a) && v.pvJob != 0 {
+		if j := v.job(a, v.pvJob); j != nil {
+			return []gitlab.Job{*j}
+		}
+	}
+	return nil
 }
 
 func (v *pipelineView) rows(a *App) []gitlab.Job {
@@ -195,7 +230,7 @@ func (v *pipelineView) moved() tea.Cmd {
 }
 
 func (v *pipelineView) help() []kb {
-	return []kb{{"enter", "log"}, {"r", "retry"}, {"p", "play/auto-play"}, {"x", "cancel"}, {"R/X", "retry/cancel pipeline"}, {"v", "preview"}, {"T", "tests"}, {"D", "dependencies"}, {"]/[", "next/prev failed"}}
+	return []kb{{"enter", "log"}, {"r", "retry"}, {"p", "play/auto-play"}, {"x", "cancel"}, {"R/X", "retry/cancel pipeline"}, {"w", "watch"}, {"v", "preview"}, {"T", "tests"}, {"D", "dependencies"}, {"]/[", "next/prev failed"}}
 }
 
 func (v *pipelineView) key(a *App, msg tea.KeyMsg) tea.Cmd {
@@ -281,6 +316,15 @@ func (v *pipelineView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 		return openBrowser(j.WebURL)
 	case "y":
 		return copyText(j.WebURL)
+	case "w":
+		if v.watch[name] {
+			delete(v.watch, name)
+			a.setFlash("stopped watching "+name, false)
+		} else {
+			v.watch[name] = true
+			a.setFlash(fmt.Sprintf("watching %s (%d)", name, len(v.watch)), false)
+		}
+		return v.refresh(a, false)
 	case "r":
 		if j.IsBridge {
 			a.setFlash("trigger jobs can't be retried individually; use R", true)
@@ -335,7 +379,8 @@ func (v *pipelineView) render(a *App, w, h int) string {
 
 	avail := h - lines
 	listH := avail
-	showPreview := v.preview(a) && avail >= 16
+	watched := v.watched(a)
+	showPreview := (v.preview(a) || len(watched) > 0) && avail >= 16
 	if showPreview {
 		listH = min(len(rows)+1, max(6, avail*45/100))
 	}
@@ -343,6 +388,9 @@ func (v *pipelineView) render(a *App, w, h int) string {
 	cells := make([][]string, len(rows))
 	for i, j := range rows {
 		name := j.Name
+		if v.watch[j.Name] {
+			name = sWatched.Render(ic.watch + " " + name)
+		}
 		if j.IsBridge {
 			name = "⇢ " + name
 			if ds := j.DownstreamPipeline; ds != nil {
@@ -378,20 +426,52 @@ func (v *pipelineView) render(a *App, w, h int) string {
 	}
 
 	if showPreview {
-		previewH := avail - listH
-		b.WriteString(v.renderPreview(a, w, previewH))
+		b.WriteString(v.renderLogs(a, watched, w, avail-listH))
 	}
 	return b.String()
 }
 
-func (v *pipelineView) renderPreview(a *App, w, h int) string {
-	j := v.selected(a)
-	if j == nil {
+// renderLogs splits h rows evenly between the watched jobs' logs, or
+// shows the selected job's when nothing is watched.
+func (v *pipelineView) renderLogs(a *App, watched []gitlab.Job, w, h int) string {
+	if len(watched) == 0 {
+		if j := v.selected(a); j != nil {
+			return v.renderLog(a, j, false, "", w, h)
+		}
 		return ""
 	}
-	title := " " + j.Name + " "
-	rule := sBorder.Render("──") + sBold.Render(title) + sBorder.Render(strings.Repeat("─", max(0, w-2-ansi.StringWidth(title))))
-	h--
+	const minH = 3 // rule and two log lines
+	n := min(len(watched), max(1, h/minH))
+	var parts []string
+	for i, j := range watched[:n] {
+		ph := h / n
+		if i < h%n {
+			ph++
+		}
+		note := ""
+		if i == n-1 && n < len(watched) {
+			note = fmt.Sprintf("+%d more watched, no room ", len(watched)-n)
+		}
+		parts = append(parts, v.renderLog(a, &j, true, note, w, ph))
+	}
+	return strings.Join(parts, "\n")
+}
+
+// renderLog draws one job's log tail in h rows, under a rule with its
+// name (and a note, if any). Clicking the name opens the full log.
+func (v *pipelineView) renderLog(a *App, j *gitlab.Job, watched bool, note string, w, h int) string {
+	label := sBold.Render(" " + j.Name + " ")
+	if watched {
+		label = " " + statusIcon(a.shownStatus(j), j.AllowFailure) + sWatched.Render(" "+j.Name+" ")
+	}
+	p, id, name := v.project, j.ID, j.Name
+	label = a.zone(label, zone{click: func(bool) tea.Cmd { return a.push(newTraceView(p, id, name)) }})
+	if note != "" {
+		label += sDim.Render(note)
+	}
+	rule := sBorder.Render("──") + label
+	rule += sBorder.Render(strings.Repeat("─", max(0, w-ansi.StringWidth(rule))))
+	h = max(0, h-1)
 	var body []string
 	switch {
 	case j.IsBridge:
@@ -402,7 +482,7 @@ func (v *pipelineView) renderPreview(a *App, w, h int) string {
 			body = []string{sDim.Render("  trigger job, no downstream pipeline yet")}
 		}
 	case j.StartedAt == nil:
-		body = []string{sDim.Render("  job is " + j.Status + " — no log yet")}
+		body = []string{sDim.Render("  job is " + a.shownStatus(j) + " — no log yet")}
 	default:
 		t := a.store.traces[traceKey(v.project, j.ID)]
 		switch {
@@ -419,7 +499,10 @@ func (v *pipelineView) renderPreview(a *App, w, h int) string {
 			}
 		}
 	}
-	return rule + "\n" + strings.Join(body, "\n")
+	for len(body) < h {
+		body = append(body, "")
+	}
+	return rule + "\n" + strings.Join(body[:h], "\n")
 }
 
 func (v *pipelineView) progress(a *App) string { return listProgress(v.l.cursor, len(v.rows(a))) }

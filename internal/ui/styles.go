@@ -45,6 +45,7 @@ var (
 	sSection  lipgloss.Style
 	sDirect   lipgloss.Style // a selected job's own dependency lines
 	sIndirect lipgloss.Style // and those further up- and downstream
+	sWatched  lipgloss.Style // jobs whose logs the pipeline view is showing
 	sBrand    lipgloss.Style
 	sTabOn    lipgloss.Style
 	sTabOff   lipgloss.Style
@@ -105,6 +106,7 @@ func applyTheme(t Theme) {
 	sSection = lipgloss.NewStyle().Foreground(cCyan).Bold(true)
 	sDirect = lipgloss.NewStyle().Foreground(cCyan).Bold(true)
 	sIndirect = lipgloss.NewStyle().Foreground(cBlue)
+	sWatched = lipgloss.NewStyle().Foreground(cCyan).Bold(true)
 	sBrand = lipgloss.NewStyle().Foreground(cMagenta)
 	sTabOn = lipgloss.NewStyle().Foreground(cBlue).Bold(true).Underline(true)
 	sTabOff = lipgloss.NewStyle().Foreground(cGray)
@@ -131,7 +133,7 @@ type iconSet struct {
 	user, review, comment, check, search, home   string
 	job, approved, draft, caret, clock, conflict string
 	label, checked, unchecked                    string
-	folder, folderOpen                           string
+	folder, folderOpen, watch                    string
 }
 
 var nerdIcons = iconSet{
@@ -145,7 +147,7 @@ var nerdIcons = iconSet{
 	search: "\uf002", home: "\uf015", job: "\uf120", approved: "\uf00c", draft: "\uf040",
 	caret: "\uf054", clock: "\uf017", conflict: "\uf071",
 	label: "\uf02b", checked: "\uf14a", unchecked: "\uf096",
-	folder: "\uf07b", folderOpen: "\uf07c",
+	folder: "\uf07b", folderOpen: "\uf07c", watch: "\uf06e",
 }
 
 var unicodeIcons = iconSet{
@@ -159,7 +161,7 @@ var unicodeIcons = iconSet{
 	search: "/", home: "⌂", job: "$", approved: "✓", draft: "✎",
 	caret: ">", clock: "◷", conflict: "⚠",
 	label: "#", checked: "☑", unchecked: "☐",
-	folder: "▤", folderOpen: "▤",
+	folder: "▤", folderOpen: "▤", watch: "◉",
 }
 
 var ic = nerdIcons
