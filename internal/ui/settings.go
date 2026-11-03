@@ -27,6 +27,7 @@ const (
 	setIcons
 	setMouse
 	setPreview
+	setWrap
 	setNotify
 	nSettings
 )
@@ -120,6 +121,9 @@ func (sp *settingsPopup) activate(a *App, row int) tea.Cmd {
 	case setPreview:
 		a.opts.Preview = !a.opts.Preview
 		a.saveSetting("log preview", a.opts.Preview, "ui", "preview")
+	case setWrap:
+		a.opts.Wrap = !a.opts.Wrap
+		a.saveSetting("log wrapping", a.opts.Wrap, "ui", "wrap")
 	case setNotify:
 		a.opts.Notify = !a.opts.Notify
 		a.saveSetting("notifications", a.opts.Notify, "ui", "notify")
@@ -152,6 +156,7 @@ func (sp *settingsPopup) render(a *App, body string, w, h int) string {
 		{"Icons", cfg.UI.Icons, "nerd needs a Nerd Font; unicode works everywhere"},
 		{"Mouse", onOff(a.opts.Mouse), "clicks, wheel and drag-to-copy"},
 		{"Log preview", onOff(a.opts.Preview), "job log under the pipeline's jobs"},
+		{"Wrap logs", onOff(a.opts.Wrap), "off cuts long log lines at the edge; h/l scroll them in the job log"},
 		{"Notifications", onOff(a.opts.Notify), "when a watched pipeline finishes"},
 	}
 	labelW := 0

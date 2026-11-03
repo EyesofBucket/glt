@@ -9,6 +9,8 @@ A fast terminal UI for GitLab merge requests and pipelines.
 - Fuzzy project picker with a list or group tree view
 - Create, edit, approve, merge, and rebase MRs, edit labels, and comment
 - Pipelines and job logs that update live, with retry, play, and cancel
+- Auto-play: press `p` on a created job to play it as soon as it becomes manual
+- Watch several job logs at once in the pipeline view (`w`)
 - Test results from JUnit reports
 - Job dependency graph, with each matrix job and each dependency line shown separately
 - Themes, mouse support, and drag-to-copy
@@ -93,6 +95,7 @@ ui:
   icons: nerd                     # nerd | unicode
   mouse: true
   preview: true                   # log preview in the pipeline view
+  wrap: true                      # wrap long job log lines
   notify: false
 ```
 

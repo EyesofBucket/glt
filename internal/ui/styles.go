@@ -45,6 +45,7 @@ var (
 	sSection  lipgloss.Style
 	sDirect   lipgloss.Style // a selected job's own dependency lines
 	sIndirect lipgloss.Style // and those further up- and downstream
+	sWatched  lipgloss.Style // jobs whose logs the pipeline view is showing
 	sBrand    lipgloss.Style
 	sTabOn    lipgloss.Style
 	sTabOff   lipgloss.Style
@@ -105,6 +106,7 @@ func applyTheme(t Theme) {
 	sSection = lipgloss.NewStyle().Foreground(cCyan).Bold(true)
 	sDirect = lipgloss.NewStyle().Foreground(cCyan).Bold(true)
 	sIndirect = lipgloss.NewStyle().Foreground(cBlue)
+	sWatched = lipgloss.NewStyle().Foreground(cCyan).Bold(true)
 	sBrand = lipgloss.NewStyle().Foreground(cMagenta)
 	sTabOn = lipgloss.NewStyle().Foreground(cBlue).Bold(true).Underline(true)
 	sTabOff = lipgloss.NewStyle().Foreground(cGray)
@@ -131,35 +133,35 @@ type iconSet struct {
 	user, review, comment, check, search, home   string
 	job, approved, draft, caret, clock, conflict string
 	label, checked, unchecked                    string
-	folder, folderOpen                           string
+	folder, folderOpen, watch                    string
 }
 
 var nerdIcons = iconSet{
 	status: map[string]string{
 		"success": "\uf058", "failed": "\uf057", "allowed": "\uf06a", "running": "\uf192",
 		"pending": "\uf017", "scheduled": "\uf073", "preparing": "\uf110", "created": "\uf10c",
-		"manual": "\uf144", "skipped": "\uf050", "canceled": "\uf05e",
+		"manual": "\uf144", "auto-play": "\uf01d", "skipped": "\uf050", "canceled": "\uf05e",
 	},
 	mr: "\uf407", pipeline: "\uf135", project: "\uf401", todo: "\uf0ae", branch: "\ue725",
 	gitlab: "\uf296", user: "\uf007", review: "\uf06e", comment: "\uf075", check: "\uf00c",
 	search: "\uf002", home: "\uf015", job: "\uf120", approved: "\uf00c", draft: "\uf040",
 	caret: "\uf054", clock: "\uf017", conflict: "\uf071",
 	label: "\uf02b", checked: "\uf14a", unchecked: "\uf096",
-	folder: "\uf07b", folderOpen: "\uf07c",
+	folder: "\uf07b", folderOpen: "\uf07c", watch: "\uf06e",
 }
 
 var unicodeIcons = iconSet{
 	status: map[string]string{
 		"success": "✔", "failed": "✘", "allowed": "!", "running": "●",
 		"pending": "◔", "scheduled": "◷", "preparing": "◌", "created": "○",
-		"manual": "▶", "skipped": "»", "canceled": "⊘",
+		"manual": "▶", "auto-play": "▷", "skipped": "»", "canceled": "⊘",
 	},
 	mr: "⇄", pipeline: "▶", project: "▣", todo: "☐", branch: "⎇",
 	gitlab: "◆", user: "@", review: "◉", comment: "💬", check: "✓",
 	search: "/", home: "⌂", job: "$", approved: "✓", draft: "✎",
 	caret: ">", clock: "◷", conflict: "⚠",
 	label: "#", checked: "☑", unchecked: "☐",
-	folder: "▤", folderOpen: "▤",
+	folder: "▤", folderOpen: "▤", watch: "◉",
 }
 
 var ic = nerdIcons
@@ -202,6 +204,8 @@ func statusOf(status string, allowFailure bool) statusStyle {
 		st = st.Foreground(cCyan).Faint(true)
 	case "manual":
 		st = st.Foreground(cMagenta)
+	case "auto-play": // glt's own: a created job flagged to play
+		st = st.Foreground(cMagenta).Faint(true)
 	case "skipped":
 		st = st.Foreground(cGray)
 	case "canceled", "canceling":
