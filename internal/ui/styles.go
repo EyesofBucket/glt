@@ -138,7 +138,7 @@ var nerdIcons = iconSet{
 	status: map[string]string{
 		"success": "\uf058", "failed": "\uf057", "allowed": "\uf06a", "running": "\uf192",
 		"pending": "\uf017", "scheduled": "\uf073", "preparing": "\uf110", "created": "\uf10c",
-		"manual": "\uf144", "skipped": "\uf050", "canceled": "\uf05e",
+		"manual": "\uf144", "auto-play": "\uf01d", "skipped": "\uf050", "canceled": "\uf05e",
 	},
 	mr: "\uf407", pipeline: "\uf135", project: "\uf401", todo: "\uf0ae", branch: "\ue725",
 	gitlab: "\uf296", user: "\uf007", review: "\uf06e", comment: "\uf075", check: "\uf00c",
@@ -152,7 +152,7 @@ var unicodeIcons = iconSet{
 	status: map[string]string{
 		"success": "✔", "failed": "✘", "allowed": "!", "running": "●",
 		"pending": "◔", "scheduled": "◷", "preparing": "◌", "created": "○",
-		"manual": "▶", "skipped": "»", "canceled": "⊘",
+		"manual": "▶", "auto-play": "▷", "skipped": "»", "canceled": "⊘",
 	},
 	mr: "⇄", pipeline: "▶", project: "▣", todo: "☐", branch: "⎇",
 	gitlab: "◆", user: "@", review: "◉", comment: "💬", check: "✓",
@@ -202,6 +202,8 @@ func statusOf(status string, allowFailure bool) statusStyle {
 		st = st.Foreground(cCyan).Faint(true)
 	case "manual":
 		st = st.Foreground(cMagenta)
+	case "auto-play": // glt's own: a created job flagged to play
+		st = st.Foreground(cMagenta).Faint(true)
 	case "skipped":
 		st = st.Foreground(cGray)
 	case "canceled", "canceling":

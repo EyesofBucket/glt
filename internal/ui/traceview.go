@@ -93,7 +93,7 @@ func (v *traceView) refresh(a *App, force bool) tea.Cmd {
 }
 
 func (v *traceView) help() []kb {
-	return []kb{{"f", "follow"}, {"w", "wrap"}, {"/ n N", "search"}, {"[ ]", "sections"}, {"T", "timestamps"}, {"r", "retry"}, {"p", "play"}, {"x", "cancel"}, {"o", "browser"}}
+	return []kb{{"f", "follow"}, {"w", "wrap"}, {"/ n N", "search"}, {"[ ]", "sections"}, {"T", "timestamps"}, {"r", "retry"}, {"p", "play/auto-play"}, {"x", "cancel"}, {"o", "browser"}}
 }
 
 func (v *traceView) trace(a *App) *traceState { return a.store.traces[traceKey(v.project, v.job)] }
@@ -342,6 +342,9 @@ func (v *traceView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 		})
 	case "p":
 		p, id := v.project, v.job
+		if j, _ := v.jobInfo(a); j != nil && j.Pipeline != nil {
+			return a.playJob(p, j.Pipeline.ID, j, v.invalidations(a))
+		}
 		return a.action("play "+v.title(), func() error { _, err := a.client.PlayJob(bg(), p, id); return err }, v.invalidations(a), nil)
 	case "x":
 		p, id := v.project, v.job
@@ -368,7 +371,7 @@ func (v *traceView) render(a *App, w, h int) string {
 	// header line
 	var hdr string
 	if j != nil {
-		hdr = sTitle.Render(j.Name) + "  " + statusLabel(j.Status, j.AllowFailure)
+		hdr = sTitle.Render(j.Name) + "  " + statusLabel(a.shownStatus(j), j.AllowFailure)
 		if d := elapsed(j.Status, j.StartedAt, j.FinishedAt, j.Duration); d != "" {
 			hdr += sDim.Render("  ⏱ " + d)
 		}
@@ -412,9 +415,14 @@ func (v *traceView) render(a *App, w, h int) string {
 	switch {
 	case t == nil || (t.lineCount() == 0 && (t.loading || t.at.IsZero())):
 		if j != nil && j.StartedAt == nil {
-			b.WriteString(sDim.Render("\n  job is " + j.Status + " — no log yet"))
-			if j.Status == "manual" {
+			b.WriteString(sDim.Render("\n  job is " + a.shownStatus(j) + " — no log yet"))
+			switch a.shownStatus(j) {
+			case "manual":
 				b.WriteString(sDim.Render(" (p to play)"))
+			case "created":
+				b.WriteString(sDim.Render(" (p to play when it becomes manual)"))
+			case "auto-play":
+				b.WriteString(sDim.Render(" (plays when it becomes manual; p to cancel)"))
 			}
 		} else {
 			b.WriteString(sDim.Render("\n  " + spinnerFrame() + " loading log…"))

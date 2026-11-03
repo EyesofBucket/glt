@@ -368,7 +368,7 @@ func (dp *depsPopup) render(a *App, body string, w, h int) string {
 
 	// the highlighted job, in full
 	j := &jobs[ci]
-	head := statusIcon(j.Status, j.AllowFailure) + " " + sBold.Render(sanitize(dp.name(j))) +
+	head := statusIcon(a.shownStatus(j), j.AllowFailure) + " " + sBold.Render(sanitize(dp.name(j))) +
 		sDim.Render(fmt.Sprintf("  %s · needs %d · needed by %d", depsDetail(j), needs, needed))
 	lines := []string{head, ""}
 
@@ -436,7 +436,7 @@ func (dp *depsPopup) render(a *App, body string, w, h int) string {
 		case !up[i] && !down[i]:
 			name = sDim.Render(name)
 		}
-		top := fit(statusIcon(jb.Status, jb.AllowFailure)+" "+name, cw-1)
+		top := fit(statusIcon(a.shownStatus(jb), jb.AllowFailure)+" "+name, cw-1)
 		tw := ansi.StringWidth(top)
 		if i == ci {
 			top = selectLine(top, tw)

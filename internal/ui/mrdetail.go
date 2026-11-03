@@ -430,7 +430,7 @@ func (v *mrDetailView) content(a *App, w int) []string {
 		line += sDim.Render("  · p or click to open, n to run a new one")
 		add(a.zone(fit(line, w), zone{click: func(bool) tea.Cmd { return a.push(newPipelineView(p, id, "")) }}))
 		if jobs, _ := get[[]gitlab.Job](a.store, jobsKey(p, pl.ID)); jobs != nil {
-			add(stageChips(jobs, w)...)
+			add(stageChips(a, jobs, w)...)
 		}
 		if s, _ := get[*gitlab.TestSummary](a.store, testSumKey(p, pl.ID)); s != nil && s.Total.Count > 0 {
 			pl := pl
@@ -591,13 +591,13 @@ func naturalLess(a, b string) bool {
 }
 
 // stageChips renders a compact "stage ✔✔✘ › stage ●○" summary, wrapped to w.
-func stageChips(jobs []gitlab.Job, w int) []string {
+func stageChips(a *App, jobs []gitlab.Job, w int) []string {
 	var lines []string
 	cur := ""
 	for i, g := range groupStages(jobs) {
 		var icons strings.Builder
 		for _, j := range g.jobs {
-			icons.WriteString(statusIcon(j.Status, j.AllowFailure))
+			icons.WriteString(statusIcon(a.shownStatus(&j), j.AllowFailure))
 		}
 		chip := sDim.Render(g.name) + " " + icons.String()
 		if i > 0 {

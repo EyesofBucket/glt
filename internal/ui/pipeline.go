@@ -195,7 +195,7 @@ func (v *pipelineView) moved() tea.Cmd {
 }
 
 func (v *pipelineView) help() []kb {
-	return []kb{{"enter", "log"}, {"r", "retry"}, {"p", "play"}, {"x", "cancel"}, {"R/X", "retry/cancel pipeline"}, {"v", "preview"}, {"T", "tests"}, {"D", "dependencies"}, {"]/[", "next/prev failed"}}
+	return []kb{{"enter", "log"}, {"r", "retry"}, {"p", "play/auto-play"}, {"x", "cancel"}, {"R/X", "retry/cancel pipeline"}, {"v", "preview"}, {"T", "tests"}, {"D", "dependencies"}, {"]/[", "next/prev failed"}}
 }
 
 func (v *pipelineView) key(a *App, msg tea.KeyMsg) tea.Cmd {
@@ -288,11 +288,7 @@ func (v *pipelineView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 		}
 		return a.action("retry "+name, func() error { _, err := a.client.RetryJob(bg(), p, jid); return err }, inval, nil)
 	case "p":
-		if j.Status != "manual" {
-			a.setFlash(name+" is not a manual job", true)
-			return nil
-		}
-		return a.action("play "+name, func() error { _, err := a.client.PlayJob(bg(), p, jid); return err }, inval, nil)
+		return a.playJob(p, v.id, j, inval)
 	case "x":
 		return a.action("cancel "+name, func() error { return a.client.CancelJob(bg(), p, jid) }, inval, nil)
 	}
@@ -360,7 +356,7 @@ func (v *pipelineView) render(a *App, w, h int) string {
 		if j.Runner != nil {
 			runner = j.Runner.Description
 		}
-		cells[i] = []string{sStage.Render(j.Stage), statusLabel(j.Status, j.AllowFailure), name,
+		cells[i] = []string{sStage.Render(j.Stage), statusLabel(a.shownStatus(&j), j.AllowFailure), name,
 			sDim.Render(elapsed(j.Status, j.StartedAt, j.FinishedAt, j.Duration)), sDim.Render(runner), sDim.Render(strconv.Itoa(j.ID))}
 	}
 	t := newTable([]col{
