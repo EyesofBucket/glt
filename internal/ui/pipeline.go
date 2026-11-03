@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -389,7 +390,7 @@ func (v *pipelineView) render(a *App, w, h int) string {
 	for i, j := range rows {
 		name := j.Name
 		if v.watch[j.Name] {
-			name = sWatched.Render(ic.watch + " " + name)
+			name = sWatched.Render(name + " " + ic.watch)
 		}
 		if j.IsBridge {
 			name = "⇢ " + name
@@ -431,38 +432,55 @@ func (v *pipelineView) render(a *App, w, h int) string {
 	return b.String()
 }
 
-// renderLogs splits h rows evenly between the watched jobs' logs, or
-// shows the selected job's when nothing is watched.
+// renderLogs splits w columns evenly between the watched jobs' logs,
+// side by side, or shows the selected job's when nothing is watched.
 func (v *pipelineView) renderLogs(a *App, watched []gitlab.Job, w, h int) string {
 	if len(watched) == 0 {
 		if j := v.selected(a); j != nil {
-			return v.renderLog(a, j, false, "", w, h)
+			return strings.Join(v.renderLog(a, j, false, "", w, h), "\n")
 		}
 		return ""
 	}
-	const minH = 3 // rule and two log lines
-	n := min(len(watched), max(1, h/minH))
-	var parts []string
+	const minW = 24
+	n := min(len(watched), max(1, (w+1)/(minW+1)))
+	cols := make([][]string, n)
 	for i, j := range watched[:n] {
-		ph := h / n
-		if i < h%n {
-			ph++
+		pw := (w - (n - 1)) / n
+		if i < (w-(n-1))%n {
+			pw++
 		}
 		note := ""
 		if i == n-1 && n < len(watched) {
-			note = fmt.Sprintf("+%d more watched, no room ", len(watched)-n)
+			note = fmt.Sprintf("+%d more ", len(watched)-n)
 		}
-		parts = append(parts, v.renderLog(a, &j, true, note, w, ph))
+		cols[i] = v.renderLog(a, &j, true, note, pw, h)
 	}
-	return strings.Join(parts, "\n")
+	rows := make([]string, h)
+	for r := range rows {
+		sep := sBorder.Render("│")
+		if r == 0 {
+			sep = sBorder.Render("┬")
+		}
+		parts := make([]string, n)
+		for i := range cols {
+			parts[i] = cols[i][r]
+		}
+		rows[r] = strings.Join(parts, sep)
+	}
+	return strings.Join(rows, "\n")
 }
 
-// renderLog draws one job's log tail in h rows, under a rule with its
-// name (and a note, if any). Clicking the name opens the full log.
-func (v *pipelineView) renderLog(a *App, j *gitlab.Job, watched bool, note string, w, h int) string {
-	label := sBold.Render(" " + j.Name + " ")
+// renderLog draws one job's log tail as h lines of width w, under a rule
+// with its name (and a note, if any). Clicking the name opens the full
+// log.
+func (v *pipelineView) renderLog(a *App, j *gitlab.Job, watched bool, note string, w, h int) []string {
+	name := j.Name
+	if room := w - 6 - ansi.StringWidth(note); ansi.StringWidth(name) > room {
+		name = ansi.Truncate(name, max(1, room), "…")
+	}
+	label := sBold.Render(" " + name + " ")
 	if watched {
-		label = " " + statusIcon(a.shownStatus(j), j.AllowFailure) + sWatched.Render(" "+j.Name+" ")
+		label = " " + statusIcon(a.shownStatus(j), j.AllowFailure) + sWatched.Render(" "+name+" ")
 	}
 	p, id, name := v.project, j.ID, j.Name
 	label = a.zone(label, zone{click: func(bool) tea.Cmd { return a.push(newTraceView(p, id, name)) }})
@@ -471,7 +489,13 @@ func (v *pipelineView) renderLog(a *App, j *gitlab.Job, watched bool, note strin
 	}
 	rule := sBorder.Render("──") + label
 	rule += sBorder.Render(strings.Repeat("─", max(0, w-ansi.StringWidth(rule))))
-	h = max(0, h-1)
+	if ansi.StringWidth(rule) > w {
+		rule = fit(rule, w)
+	}
+	if h <= 0 {
+		return nil
+	}
+	h--
 	var body []string
 	switch {
 	case j.IsBridge:
@@ -493,16 +517,35 @@ func (v *pipelineView) renderLog(a *App, j *gitlab.Job, watched bool, note strin
 		case t.lineCount() == 0:
 			body = []string{sDim.Render("  (empty log)")}
 		default:
-			from := max(0, t.lineCount()-h)
-			for i := from; i < t.lineCount(); i++ {
-				body = append(body, ansi.Truncate(t.line(i), w, ""))
-			}
+			body = logTail(t, w, h, a.opts.Wrap)
 		}
 	}
 	for len(body) < h {
 		body = append(body, "")
 	}
-	return rule + "\n" + strings.Join(body[:h], "\n")
+	lines := []string{rule}
+	for _, l := range body[:h] {
+		lines = append(lines, pad(fit(l, w), w))
+	}
+	return lines
+}
+
+// logTail is the last h rows of t at width w, wrapping long lines when
+// wrap is set.
+func logTail(t *traceState, w, h int, wrap bool) []string {
+	var rows []string
+	for i := t.lineCount() - 1; i >= 0 && len(rows) < h; i-- {
+		if !wrap {
+			rows = append(rows, ansi.Truncate(t.line(i), w, ""))
+			continue
+		}
+		parts := strings.Split(ansi.Hardwrap(t.line(i), max(1, w), true), "\n")
+		for k := len(parts) - 1; k >= 0 && len(rows) < h; k-- {
+			rows = append(rows, parts[k])
+		}
+	}
+	slices.Reverse(rows)
+	return rows
 }
 
 func (v *pipelineView) progress(a *App) string { return listProgress(v.l.cursor, len(v.rows(a))) }

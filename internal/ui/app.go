@@ -43,6 +43,7 @@ type kb struct{ k, d string }
 type Options struct {
 	Notify  bool
 	Preview bool         // log preview pane in the pipeline view
+	Wrap    bool         // wrap long job log lines
 	Mouse   bool         // mouse captured
 	Config  *config.File // for the settings popup; may be nil
 }

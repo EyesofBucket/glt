@@ -207,6 +207,7 @@ func main() {
 	app := ui.New(ctx, client, stack, ui.Options{
 		Notify:  notify || cfg.UI.Notify,
 		Preview: cfg.PreviewEnabled(),
+		Wrap:    cfg.WrapEnabled(),
 		Mouse:   mouse,
 		Config:  cfg,
 	})

@@ -95,6 +95,7 @@ ui:
   icons: nerd                     # nerd | unicode
   mouse: true
   preview: true                   # log preview in the pipeline view
+  wrap: true                      # wrap long job log lines
   notify: false
 ```
 

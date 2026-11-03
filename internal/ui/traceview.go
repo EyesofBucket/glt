@@ -93,7 +93,7 @@ func (v *traceView) refresh(a *App, force bool) tea.Cmd {
 }
 
 func (v *traceView) help() []kb {
-	return []kb{{"f", "follow"}, {"w", "wrap"}, {"/ n N", "search"}, {"[ ]", "sections"}, {"T", "timestamps"}, {"r", "retry"}, {"p", "play/auto-play"}, {"x", "cancel"}, {"o", "browser"}}
+	return []kb{{"f", "follow"}, {"/ n N", "search"}, {"[ ]", "sections"}, {"T", "timestamps"}, {"r", "retry"}, {"p", "play/auto-play"}, {"x", "cancel"}, {"o", "browser"}}
 }
 
 func (v *traceView) trace(a *App) *traceState { return a.store.traces[traceKey(v.project, v.job)] }
@@ -143,6 +143,26 @@ func (v *traceView) gutterW(t *traceState) int {
 		w += 9
 	}
 	return w
+}
+
+// syncWrap follows the wrap setting, keeping the top line in place when
+// it changes.
+func (v *traceView) syncWrap(a *App, t *traceState) {
+	if v.wrap == a.opts.Wrap {
+		return
+	}
+	src := -1
+	if t != nil {
+		src = v.srcLine(t, v.top)
+	}
+	v.wrap, v.xoff = a.opts.Wrap, 0
+	v.wrapped, v.wrapSrc, v.wrapN = nil, nil, 0
+	if t != nil {
+		v.ensureWrap(t, a.w)
+		if src >= 0 {
+			v.top = v.displayRow(t, src)
+		}
+	}
 }
 
 func (v *traceView) ensureWrap(t *traceState, w int) {
@@ -220,6 +240,7 @@ func (v *traceView) centre(t *traceState, src int) {
 
 func (v *traceView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 	t := v.trace(a)
+	v.syncWrap(a, t)
 	if v.searching {
 		switch msg.String() {
 		case "esc":
@@ -274,15 +295,6 @@ func (v *traceView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 		}
 	case "0":
 		v.xoff = 0
-	case "w":
-		v.wrap = !v.wrap
-		v.xoff = 0
-		src := v.srcLine(t, v.top)
-		v.wrapped, v.wrapSrc, v.wrapN = nil, nil, 0
-		v.ensureWrap(t, a.w)
-		if src >= 0 {
-			v.top = v.displayRow(t, src)
-		}
 	case "#":
 		v.numbers = !v.numbers
 	case "T":
@@ -366,6 +378,7 @@ func (v *traceView) invalidations(a *App) []string {
 
 func (v *traceView) render(a *App, w, h int) string {
 	t := v.trace(a)
+	v.syncWrap(a, t)
 	j, je := v.jobInfo(a)
 
 	// header line
@@ -387,9 +400,6 @@ func (v *traceView) render(a *App, w, h int) string {
 	var flags []string
 	if v.follow {
 		flags = append(flags, sOK.Render("follow"))
-	}
-	if v.wrap {
-		flags = append(flags, "wrap")
 	}
 	if v.query != "" {
 		flags = append(flags, fmt.Sprintf("/%s %d hits", v.query, len(v.hits)))

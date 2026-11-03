@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
 	"gitlab-tui/internal/gitlab"
@@ -51,5 +52,18 @@ func TestAutoPlay(t *testing.T) {
 	skipped.Status = "skipped"
 	if a.checkAutoPlay(resultMsg{val: []gitlab.Job{skipped}}) != nil || len(a.autoPlay) != 0 {
 		t.Fatal("a skipped job should be unflagged without playing")
+	}
+}
+
+func TestLogTail(t *testing.T) {
+	tr := &traceState{lines: []string{"one", "abcdefghij", "two"}}
+	got := logTail(tr, 4, 4, true)
+	want := []string{"abcd", "efgh", "ij", "two"}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("wrapped tail = %q, want %q", got, want)
+	}
+	got = logTail(tr, 4, 2, false)
+	if strings.Join(got, "|") != "abcd|two" {
+		t.Fatalf("cut tail = %q", got)
 	}
 }
