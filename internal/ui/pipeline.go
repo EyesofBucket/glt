@@ -158,13 +158,10 @@ func (v *pipelineView) watched(a *App) []gitlab.Job {
 	if len(v.watch) == 0 {
 		return nil
 	}
-	jobs, _ := get[[]gitlab.Job](a.store, jobsKey(v.project, v.id))
 	var out []gitlab.Job
-	for _, g := range groupStages(jobs) {
-		for _, j := range g.jobs {
-			if v.watch[j.Name] {
-				out = append(out, j)
-			}
+	for _, j := range v.ordered(a) {
+		if v.watch[j.Name] {
+			out = append(out, j)
 		}
 	}
 	return out
@@ -185,14 +182,24 @@ func (v *pipelineView) logJobs(a *App) []gitlab.Job {
 }
 
 func (v *pipelineView) rows(a *App) []gitlab.Job {
+	var out []gitlab.Job
+	for _, j := range v.ordered(a) {
+		if matches(v.l.query, j.Name, j.Stage, j.Status) {
+			out = append(out, j)
+		}
+	}
+	return out
+}
+
+// ordered lists the pipeline's jobs by stage, then by ID within a stage,
+// so a retried job moves to the end of its stage.
+func (v *pipelineView) ordered(a *App) []gitlab.Job {
 	jobs, _ := get[[]gitlab.Job](a.store, jobsKey(v.project, v.id))
 	var out []gitlab.Job
 	for _, g := range groupStages(jobs) {
-		for _, j := range g.jobs {
-			if matches(v.l.query, j.Name, j.Stage, j.Status) {
-				out = append(out, j)
-			}
-		}
+		sorted := slices.Clone(g.jobs)
+		slices.SortFunc(sorted, func(x, y gitlab.Job) int { return x.ID - y.ID })
+		out = append(out, sorted...)
 	}
 	return out
 }
