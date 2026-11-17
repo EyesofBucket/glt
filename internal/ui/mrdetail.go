@@ -318,7 +318,7 @@ func (v *mrDetailView) content(a *App, w int) []string {
 			approvals = append(approvals, sDim.Render("none yet"))
 		}
 		for _, u := range ap.ApprovedBy {
-			line := sOK.Render(ic.approved) + " @" + u.User.Username
+			line := sOK.Render(ic.approved+" ") + "@" + u.User.Username
 			if me != nil && u.User.Username == me.Username {
 				line += sDim.Render(" (a revokes)")
 			}
@@ -595,17 +595,23 @@ func stageChips(a *App, jobs []gitlab.Job, w int) []string {
 	var lines []string
 	cur := ""
 	for i, g := range groupStages(jobs) {
+		// each icon's overflow lands on the next icon, and the last one's
+		// on its own trailing space
 		var icons strings.Builder
-		for _, j := range g.jobs {
-			icons.WriteString(statusIcon(a.shownStatus(&j), j.AllowFailure))
+		for k, j := range g.jobs {
+			if k == len(g.jobs)-1 {
+				icons.WriteString(statusIconSp(a.shownStatus(&j), j.AllowFailure))
+			} else {
+				icons.WriteString(statusIcon(a.shownStatus(&j), j.AllowFailure))
+			}
 		}
 		chip := sDim.Render(g.name) + " " + icons.String()
 		if i > 0 {
-			chip = sDim.Render(" › ") + chip
+			chip = sDim.Render("› ") + chip
 		}
 		if cur != "" && ansi.StringWidth(cur)+ansi.StringWidth(chip) > w {
 			lines = append(lines, cur)
-			cur = strings.TrimPrefix(chip, sDim.Render(" › "))
+			cur = strings.TrimPrefix(chip, sDim.Render("› "))
 		} else {
 			cur += chip
 		}

@@ -636,9 +636,9 @@ func (v *mrNewView) render(a *App, w, h int) string {
 	}
 	check := func(on bool) string {
 		if on {
-			return sOK.Render(ic.checked)
+			return sOK.Render(ic.checked + " ")
 		}
-		return sDim.Render(ic.unchecked)
+		return sDim.Render(ic.unchecked + " ")
 	}
 
 	titleRow := func() {
@@ -692,8 +692,8 @@ func (v *mrNewView) render(a *App, w, h int) string {
 		row(fAssign, "Assign to me", check(v.assignMe))
 	}
 	row(fDraft, "Draft", check(v.draft))
-	row(fRemove, "Delete source branch", check(v.removeSource)+sDim.Render("  when merged"))
-	row(fSquash, "Squash commits", check(v.squash)+sDim.Render("  when merged"))
+	row(fRemove, "Delete source branch", check(v.removeSource)+sDim.Render(" when merged"))
+	row(fSquash, "Squash commits", check(v.squash)+sDim.Render(" when merged"))
 	add("")
 	// the description is last, taking the height left above the button
 	descH := max(3, h-len(L)-2)

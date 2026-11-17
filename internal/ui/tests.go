@@ -429,14 +429,15 @@ func testOutput(tc *gitlab.TestCase) string {
 	return strings.Join(parts, "\n\n")
 }
 
+// testIcon is a test case's status icon and the space after it.
 func testIcon(status string) string {
 	switch status {
 	case "error":
-		return sErr.Render(ic.status["failed"])
+		return sErr.Render(ic.status["failed"] + " ")
 	case "success", "failed", "skipped":
-		return statusIcon(status, false)
+		return statusIconSp(status, false)
 	}
-	return sDim.Render("?")
+	return sDim.Render("? ")
 }
 
 func secs(f float64) string {
@@ -504,7 +505,7 @@ func (tp *testsPopup) render(a *App, body string, w, h int) string {
 		sel := i == tp.l.cursor
 		mark := "  "
 		if sel {
-			mark = sActive.Render(ic.caret) + " "
+			mark = sActive.Render(ic.caret + " ")
 		}
 		var left, rt string
 		if row.tc == nil {
@@ -527,7 +528,7 @@ func (tp *testsPopup) render(a *App, body string, w, h int) string {
 				rt = sDim.Render(fmt.Sprintf("%d shown  ", row.shown)) + rt
 			}
 		} else {
-			left = "  " + testIcon(row.tc.Status) + " " + sanitize(row.tc.Name)
+			left = "  " + testIcon(row.tc.Status) + sanitize(row.tc.Name)
 			if row.tc.Classname != "" {
 				left += " " + sDim.Render(sanitize(row.tc.Classname))
 			}

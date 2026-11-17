@@ -397,12 +397,12 @@ func (v *pipelineView) render(a *App, w, h int) string {
 	for i, j := range rows {
 		name := j.Name
 		if v.watch[j.Name] {
-			name = sWatched.Render(name + " " + ic.watch)
+			name = sWatched.Render(name + " " + ic.watch + " ")
 		}
 		if j.IsBridge {
 			name = "⇢ " + name
 			if ds := j.DownstreamPipeline; ds != nil {
-				name += sDim.Render(fmt.Sprintf("  → #%d ", ds.ID)) + statusIcon(ds.Status, false)
+				name += sDim.Render(fmt.Sprintf("  → #%d ", ds.ID)) + statusIconSp(ds.Status, false)
 			}
 		}
 		if j.FailureReason != "" && j.Status == "failed" {
@@ -487,7 +487,7 @@ func (v *pipelineView) renderLog(a *App, j *gitlab.Job, watched bool, note strin
 	}
 	label := sBold.Render(" " + name + " ")
 	if watched {
-		label = " " + statusIcon(a.shownStatus(j), j.AllowFailure) + sWatched.Render(" "+name+" ")
+		label = " " + statusIconSp(a.shownStatus(j), j.AllowFailure) + sWatched.Render(name+" ")
 	}
 	p, id, name := v.project, j.ID, j.Name
 	label = a.zone(label, zone{click: func(bool) tea.Cmd { return a.push(newTraceView(p, id, name)) }})

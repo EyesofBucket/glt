@@ -170,7 +170,7 @@ func (sp *settingsPopup) render(a *App, body string, w, h int) string {
 		mark := "  "
 		label := sDim.Render(pad(r.label, labelW))
 		if i == sp.cursor {
-			mark = sActive.Render(ic.caret) + " "
+			mark = sActive.Render(ic.caret + " ")
 			label = sActiveT.Render(pad(r.label, labelW))
 		}
 		line := pad(mark+label+colGap+r.value, inner)

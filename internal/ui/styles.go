@@ -223,6 +223,14 @@ func statusIcon(status string, allowFailure bool) string {
 	return s.style.Render(s.icon)
 }
 
+// statusIconSp is statusIcon followed by a space in the same style. Some
+// terminals draw a wide icon's overflow in the colours of the cell after
+// it, so an icon's trailing space should share its style.
+func statusIconSp(status string, allowFailure bool) string {
+	s := statusOf(status, allowFailure)
+	return s.style.Render(s.icon + " ")
+}
+
 func statusLabel(status string, allowFailure bool) string {
 	s := statusOf(status, allowFailure)
 	label := status
