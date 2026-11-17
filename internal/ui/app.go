@@ -43,6 +43,7 @@ type kb struct{ k, d string }
 type Options struct {
 	Notify  bool
 	Preview bool         // log preview pane in the pipeline view
+	Wrap    bool         // wrap long job log lines
 	Mouse   bool         // mouse captured
 	Config  *config.File // for the settings popup; may be nil
 }
@@ -73,6 +74,7 @@ type App struct {
 	projPaths map[int]string
 	// pipeline statuses we've seen, for completion notifications
 	seenStatus map[int]string
+	autoPlay   map[int]autoPlayJob // by job ID
 }
 
 // overlay is a floating finder drawn over the current view; it takes all
@@ -124,6 +126,7 @@ func New(ctx *config.Context, client *gitlab.Client, stack []View, opts Options)
 		projIDs:    map[string]int{},
 		projPaths:  map[int]string{},
 		seenStatus: map[int]string{},
+		autoPlay:   map[int]autoPlayJob{},
 	}
 	if opts.Config != nil {
 		a.pickerTree = opts.Config.UI.Picker == "tree"
@@ -359,7 +362,7 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 		if a.flash != "" && time.Since(a.flashAt) > 6*time.Second {
 			a.flash = ""
 		}
-		return tea.Batch(tick(), a.refreshVisible(false))
+		return tea.Batch(tick(), a.refreshVisible(false), a.pollAutoPlay())
 
 	case resultMsg:
 		if msg.store != a.store {
@@ -370,7 +373,7 @@ func (a *App) update(msg tea.Msg) tea.Cmd {
 			a.checkNotify(msg)
 		}
 		// newly arrived data may unlock dependent fetches
-		return a.refreshVisible(false)
+		return tea.Batch(a.refreshVisible(false), a.checkAutoPlay(msg))
 
 	case traceMsg:
 		if msg.store != a.store {

@@ -93,7 +93,7 @@ func (v *traceView) refresh(a *App, force bool) tea.Cmd {
 }
 
 func (v *traceView) help() []kb {
-	return []kb{{"f", "follow"}, {"w", "wrap"}, {"/ n N", "search"}, {"[ ]", "sections"}, {"T", "timestamps"}, {"r", "retry"}, {"p", "play"}, {"x", "cancel"}, {"o", "browser"}}
+	return []kb{{"f", "follow"}, {"/ n N", "search"}, {"[ ]", "sections"}, {"T", "timestamps"}, {"r", "retry"}, {"p", "play/auto-play"}, {"x", "cancel"}, {"o", "browser"}}
 }
 
 func (v *traceView) trace(a *App) *traceState { return a.store.traces[traceKey(v.project, v.job)] }
@@ -143,6 +143,26 @@ func (v *traceView) gutterW(t *traceState) int {
 		w += 9
 	}
 	return w
+}
+
+// syncWrap follows the wrap setting, keeping the top line in place when
+// it changes.
+func (v *traceView) syncWrap(a *App, t *traceState) {
+	if v.wrap == a.opts.Wrap {
+		return
+	}
+	src := -1
+	if t != nil {
+		src = v.srcLine(t, v.top)
+	}
+	v.wrap, v.xoff = a.opts.Wrap, 0
+	v.wrapped, v.wrapSrc, v.wrapN = nil, nil, 0
+	if t != nil {
+		v.ensureWrap(t, a.w)
+		if src >= 0 {
+			v.top = v.displayRow(t, src)
+		}
+	}
 }
 
 func (v *traceView) ensureWrap(t *traceState, w int) {
@@ -220,6 +240,7 @@ func (v *traceView) centre(t *traceState, src int) {
 
 func (v *traceView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 	t := v.trace(a)
+	v.syncWrap(a, t)
 	if v.searching {
 		switch msg.String() {
 		case "esc":
@@ -274,15 +295,6 @@ func (v *traceView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 		}
 	case "0":
 		v.xoff = 0
-	case "w":
-		v.wrap = !v.wrap
-		v.xoff = 0
-		src := v.srcLine(t, v.top)
-		v.wrapped, v.wrapSrc, v.wrapN = nil, nil, 0
-		v.ensureWrap(t, a.w)
-		if src >= 0 {
-			v.top = v.displayRow(t, src)
-		}
 	case "#":
 		v.numbers = !v.numbers
 	case "T":
@@ -342,6 +354,9 @@ func (v *traceView) key(a *App, msg tea.KeyMsg) tea.Cmd {
 		})
 	case "p":
 		p, id := v.project, v.job
+		if j, _ := v.jobInfo(a); j != nil && j.Pipeline != nil {
+			return a.playJob(p, j.Pipeline.ID, j, v.invalidations(a))
+		}
 		return a.action("play "+v.title(), func() error { _, err := a.client.PlayJob(bg(), p, id); return err }, v.invalidations(a), nil)
 	case "x":
 		p, id := v.project, v.job
@@ -363,12 +378,13 @@ func (v *traceView) invalidations(a *App) []string {
 
 func (v *traceView) render(a *App, w, h int) string {
 	t := v.trace(a)
+	v.syncWrap(a, t)
 	j, je := v.jobInfo(a)
 
 	// header line
 	var hdr string
 	if j != nil {
-		hdr = sTitle.Render(j.Name) + "  " + statusLabel(j.Status, j.AllowFailure)
+		hdr = sTitle.Render(j.Name) + "  " + statusLabel(a.shownStatus(j), j.AllowFailure)
 		if d := elapsed(j.Status, j.StartedAt, j.FinishedAt, j.Duration); d != "" {
 			hdr += sDim.Render("  ⏱ " + d)
 		}
@@ -384,9 +400,6 @@ func (v *traceView) render(a *App, w, h int) string {
 	var flags []string
 	if v.follow {
 		flags = append(flags, sOK.Render("follow"))
-	}
-	if v.wrap {
-		flags = append(flags, "wrap")
 	}
 	if v.query != "" {
 		flags = append(flags, fmt.Sprintf("/%s %d hits", v.query, len(v.hits)))
@@ -412,9 +425,14 @@ func (v *traceView) render(a *App, w, h int) string {
 	switch {
 	case t == nil || (t.lineCount() == 0 && (t.loading || t.at.IsZero())):
 		if j != nil && j.StartedAt == nil {
-			b.WriteString(sDim.Render("\n  job is " + j.Status + " — no log yet"))
-			if j.Status == "manual" {
+			b.WriteString(sDim.Render("\n  job is " + a.shownStatus(j) + " — no log yet"))
+			switch a.shownStatus(j) {
+			case "manual":
 				b.WriteString(sDim.Render(" (p to play)"))
+			case "created":
+				b.WriteString(sDim.Render(" (p to play when it becomes manual)"))
+			case "auto-play":
+				b.WriteString(sDim.Render(" (plays when it becomes manual; p to cancel)"))
 			}
 		} else {
 			b.WriteString(sDim.Render("\n  " + spinnerFrame() + " loading log…"))

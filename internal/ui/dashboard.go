@@ -212,7 +212,7 @@ func (v *dashboardView) render(a *App, w, h int) string {
 			if d == nil {
 				return []string{emptyMsg(de, "")}
 			}
-			return v.mrLines(a, paneReview, d.Review, iw, rows, "Nothing to review "+ic.check)
+			return v.mrLines(a, paneReview, d.Review, iw, rows, "Nothing to review "+ic.check+" ")
 		}},
 		{fmt.Sprintf("%s To-Do (%d)", ic.todo, v.count(a, paneTodo)), func(iw, rows int) []string {
 			if todos == nil {
@@ -320,12 +320,12 @@ func (v *dashboardView) mrLines(a *App, p int, list []gitlab.MRSummary, w, rows 
 		}
 		flag := ""
 		if m.Approved {
-			flag = sOK.Render(ic.approved) + " "
+			flag = sOK.Render(ic.approved + " ")
 		}
 		if m.Conflicts {
-			flag = sErr.Render(ic.conflict) + " "
+			flag = sErr.Render(ic.conflict + " ")
 		}
-		cells[i] = []string{statusIcon(m.PipelineStatus, false), sDim.Render(fmt.Sprintf("!%d", m.IID)), flag + title,
+		cells[i] = []string{statusIconSp(m.PipelineStatus, false), sDim.Render(fmt.Sprintf("!%d", m.IID)), flag + title,
 			sDim.Render(shortProject(m.Project)), sDim.Render(since(m.UpdatedAt))}
 	}
 	t := newTable([]col{{}, {}, {flex: true}, {max: 24}, {right: true}}, cells, w)
@@ -367,7 +367,7 @@ func todoAction(name string) string {
 
 func (v *dashboardView) todoLines(a *App, todos []gitlab.Todo, w, rows int) []string {
 	if len(todos) == 0 {
-		return []string{sDim.Render("All done " + ic.check)}
+		return []string{sDim.Render("All done " + ic.check + " ")}
 	}
 	cells := make([][]string, len(todos))
 	for i, t := range todos {
@@ -407,7 +407,7 @@ func (v *dashboardView) recentLines(a *App, w, rows int) []string {
 		if j := strings.LastIndexByte(r.Path, '/'); j >= 0 {
 			ns, name = r.Path[:j+1], r.Path[j+1:]
 		}
-		cells[i] = []string{sDim.Render(ic.project), sDim.Render(ns) + name, sDim.Render(since(r.At))}
+		cells[i] = []string{sDim.Render(ic.project + " "), sDim.Render(ns) + name, sDim.Render(since(r.At))}
 	}
 	t := newTable([]col{{}, {flex: true}, {right: true}}, cells, w)
 	start, end := v.window(paneRecent, len(a.recent), rows)

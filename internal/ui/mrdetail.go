@@ -318,7 +318,7 @@ func (v *mrDetailView) content(a *App, w int) []string {
 			approvals = append(approvals, sDim.Render("none yet"))
 		}
 		for _, u := range ap.ApprovedBy {
-			line := sOK.Render(ic.approved) + " @" + u.User.Username
+			line := sOK.Render(ic.approved+" ") + "@" + u.User.Username
 			if me != nil && u.User.Username == me.Username {
 				line += sDim.Render(" (a revokes)")
 			}
@@ -430,7 +430,7 @@ func (v *mrDetailView) content(a *App, w int) []string {
 		line += sDim.Render("  · p or click to open, n to run a new one")
 		add(a.zone(fit(line, w), zone{click: func(bool) tea.Cmd { return a.push(newPipelineView(p, id, "")) }}))
 		if jobs, _ := get[[]gitlab.Job](a.store, jobsKey(p, pl.ID)); jobs != nil {
-			add(stageChips(jobs, w)...)
+			add(stageChips(a, jobs, w)...)
 		}
 		if s, _ := get[*gitlab.TestSummary](a.store, testSumKey(p, pl.ID)); s != nil && s.Total.Count > 0 {
 			pl := pl
@@ -591,21 +591,22 @@ func naturalLess(a, b string) bool {
 }
 
 // stageChips renders a compact "stage ✔✔✘ › stage ●○" summary, wrapped to w.
-func stageChips(jobs []gitlab.Job, w int) []string {
+func stageChips(a *App, jobs []gitlab.Job, w int) []string {
 	var lines []string
 	cur := ""
 	for i, g := range groupStages(jobs) {
+		// a space after every icon, since wide icons overlap their neighbour
 		var icons strings.Builder
 		for _, j := range g.jobs {
-			icons.WriteString(statusIcon(j.Status, j.AllowFailure))
+			icons.WriteString(statusIconSp(a.shownStatus(&j), j.AllowFailure))
 		}
 		chip := sDim.Render(g.name) + " " + icons.String()
 		if i > 0 {
-			chip = sDim.Render(" › ") + chip
+			chip = sDim.Render("› ") + chip
 		}
 		if cur != "" && ansi.StringWidth(cur)+ansi.StringWidth(chip) > w {
 			lines = append(lines, cur)
-			cur = strings.TrimPrefix(chip, sDim.Render(" › "))
+			cur = strings.TrimPrefix(chip, sDim.Render("› "))
 		} else {
 			cur += chip
 		}

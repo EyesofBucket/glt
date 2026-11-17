@@ -59,7 +59,7 @@ type choiceRow struct {
 
 func (a *App) openChooser(ch *chooser, selected []string) tea.Cmd {
 	ti := textinput.New()
-	ti.Prompt = sActive.Render(ic.caret) + " "
+	ti.Prompt = sActive.Render(ic.caret + " ")
 	ti.Placeholder = "filter"
 	focus := ti.Focus()
 	ch.input = ti
@@ -334,14 +334,14 @@ func (ch *chooser) render(a *App, body string, w, h int) string {
 func (ch *chooser) renderRow(r choiceRow, w int, selected bool) string {
 	left := "  "
 	if selected {
-		left = sActive.Render(ic.caret) + " "
+		left = sActive.Render(ic.caret + " ")
 	}
 	if ch.multi {
-		box := sDim.Render(ic.unchecked)
+		box := sDim.Render(ic.unchecked + " ")
 		if ch.on[r.c.id] {
-			box = sOK.Render(ic.checked)
+			box = sOK.Render(ic.checked + " ")
 		}
-		left += box + " "
+		left += box
 	}
 	if r.c.prefix != "" {
 		left += r.c.prefix + " "

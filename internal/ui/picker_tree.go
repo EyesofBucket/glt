@@ -196,7 +196,7 @@ func (pk *projectPicker) treeLines(a *App, w, rows int) []string {
 		selected := idx == pk.tcursor
 		mark := "  "
 		if selected {
-			mark = sActive.Render(ic.caret) + " "
+			mark = sActive.Render(ic.caret + " ")
 		}
 		indent := strings.Repeat("  ", n.depth)
 		var left, right string
@@ -206,7 +206,7 @@ func (pk *projectPicker) treeLines(a *App, w, rows int) []string {
 			if open {
 				arrow, icon = "▾", ic.folderOpen
 			}
-			left = indent + sDim.Render(arrow) + " " + sKey.Render(icon) + " " + sBold.Render(n.name)
+			left = indent + sDim.Render(arrow) + " " + sKey.Render(icon+" ") + sBold.Render(n.name)
 			right = sDim.Render(fmt.Sprint(n.count))
 		} else {
 			name := n.name
@@ -220,7 +220,7 @@ func (pk *projectPicker) treeLines(a *App, w, rows int) []string {
 				}
 				name = highlight(name, shifted, func(s string) string { return s })
 			}
-			left = indent + "  " + sDim.Render(ic.project) + " " + name
+			left = indent + "  " + sDim.Render(ic.project+" ") + name
 			if !n.res.recent.IsZero() {
 				right = sDim.Render(ic.clock + " " + since(n.res.recent))
 			} else if !n.res.p.LastActivityAt.IsZero() {

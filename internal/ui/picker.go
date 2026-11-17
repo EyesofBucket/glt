@@ -51,7 +51,7 @@ func openMRsKey(p string) string   { return "openmrs:" + p }
 
 func (a *App) openPicker() tea.Cmd {
 	ti := textinput.New()
-	ti.Prompt = sActive.Render(ic.caret) + " "
+	ti.Prompt = sActive.Render(ic.caret + " ")
 	ti.Placeholder = "search projects"
 	focus := ti.Focus()
 	pk := &projectPicker{input: ti, dirty: true, tree: a.pickerTree}
@@ -413,7 +413,7 @@ func (pk *projectPicker) renderRow(r pickResult, w int, selected bool) string {
 	}
 	mark := "  "
 	if selected {
-		mark = sActive.Render(ic.caret) + " "
+		mark = sActive.Render(ic.caret + " ")
 	}
 	right := ""
 	if !r.recent.IsZero() {
@@ -421,7 +421,7 @@ func (pk *projectPicker) renderRow(r pickResult, w int, selected bool) string {
 	} else if !r.p.LastActivityAt.IsZero() {
 		right = sDim.Render(since(r.p.LastActivityAt))
 	}
-	left := mark + sDim.Render(ic.project) + " " + hl
+	left := mark + sDim.Render(ic.project+" ") + hl
 	line := pad(left, w-ansi.StringWidth(right)-len(colGap)) + colGap + right
 	if selected {
 		return selectLine(line, w)

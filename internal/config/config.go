@@ -33,6 +33,7 @@ type UI struct {
 	Picker     string `yaml:"picker"`  // project picker view: list | tree
 	Mouse      *bool  `yaml:"mouse"`   // clicks, wheel scrolling and drag-to-copy
 	Preview    *bool  `yaml:"preview"` // log preview pane in the pipeline view
+	Wrap       *bool  `yaml:"wrap"`    // wrap long job log lines
 	Notify     bool   `yaml:"notify"`  // desktop notification when a watched pipeline finishes
 }
 
@@ -44,6 +45,7 @@ type File struct {
 
 func (f *File) MouseEnabled() bool   { return f.UI.Mouse == nil || *f.UI.Mouse }
 func (f *File) PreviewEnabled() bool { return f.UI.Preview == nil || *f.UI.Preview }
+func (f *File) WrapEnabled() bool    { return f.UI.Wrap == nil || *f.UI.Wrap }
 func (f *File) BackgroundEnabled() bool {
 	return f.UI.Background == nil || *f.UI.Background
 }
@@ -219,12 +221,14 @@ func render(cfg *File) string {
 			Picker     string `yaml:"picker"`
 			Mouse      bool   `yaml:"mouse"`
 			Preview    bool   `yaml:"preview"`
+			Wrap       bool   `yaml:"wrap"`
 			Notify     bool   `yaml:"notify"`
 		} `yaml:"ui"`
 	}
 	o := out{DefaultHost: cfg.DefaultHost, Hosts: cfg.Hosts}
 	o.UI.Theme, o.UI.Background, o.UI.Picker = cfg.UI.Theme, cfg.BackgroundEnabled(), cfg.UI.Picker
 	o.UI.Icons, o.UI.Mouse, o.UI.Preview, o.UI.Notify = cfg.UI.Icons, cfg.MouseEnabled(), cfg.PreviewEnabled(), cfg.UI.Notify
+	o.UI.Wrap = cfg.WrapEnabled()
 	b, _ := yaml.Marshal(o)
 	return header + string(b)
 }

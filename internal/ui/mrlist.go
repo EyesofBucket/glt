@@ -272,7 +272,7 @@ func (v *mrListView) render(a *App, w, h int) string {
 		if m.Notes > 0 {
 			notes = fmt.Sprint(m.Notes)
 		}
-		cells[i] = []string{statusIcon(m.PipelineStatus, false), sDim.Render(fmt.Sprintf("!%d", m.IID)), title,
+		cells[i] = []string{statusIconSp(m.PipelineStatus, false), sDim.Render(fmt.Sprintf("!%d", m.IID)), title,
 			sDim.Render("@" + m.Author), sDim.Render(m.SourceBranch), status, sDim.Render(notes), sDim.Render(since(at))}
 	}
 	t := newTable([]col{

@@ -290,7 +290,7 @@ func (v *projectView) mrLines(a *App, mrs []gitlab.MRSummary, e *entry, w, rows 
 		if m.Draft {
 			title = sDim.Render(ic.draft+" ") + strings.TrimSpace(draftRe.ReplaceAllString(title, ""))
 		}
-		cells = append(cells, []string{statusIcon(m.PipelineStatus, false), sDim.Render(fmt.Sprintf("!%d", m.IID)), title,
+		cells = append(cells, []string{statusIconSp(m.PipelineStatus, false), sDim.Render(fmt.Sprintf("!%d", m.IID)), title,
 			sDim.Render("@" + m.Author), sDim.Render(since(m.UpdatedAt))})
 	}
 	cells = cells[:min(len(cells), max(0, rows-len(L)))]
