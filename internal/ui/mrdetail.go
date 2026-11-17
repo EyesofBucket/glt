@@ -595,15 +595,10 @@ func stageChips(a *App, jobs []gitlab.Job, w int) []string {
 	var lines []string
 	cur := ""
 	for i, g := range groupStages(jobs) {
-		// each icon's overflow lands on the next icon, and the last one's
-		// on its own trailing space
+		// a space after every icon, since wide icons overlap their neighbour
 		var icons strings.Builder
-		for k, j := range g.jobs {
-			if k == len(g.jobs)-1 {
-				icons.WriteString(statusIconSp(a.shownStatus(&j), j.AllowFailure))
-			} else {
-				icons.WriteString(statusIcon(a.shownStatus(&j), j.AllowFailure))
-			}
+		for _, j := range g.jobs {
+			icons.WriteString(statusIconSp(a.shownStatus(&j), j.AllowFailure))
 		}
 		chip := sDim.Render(g.name) + " " + icons.String()
 		if i > 0 {
